@@ -18,8 +18,8 @@
 #include <fstream>
 #include <stdexcept>
 
-Cli::Cli(ICryptoBackend &crypto, se05x::Session *mgmt)
-    : crypto_(crypto), mgmt_(mgmt) {}
+Cli::Cli(ICryptoBackend &crypto, Log &log, se05x::Session *mgmt)
+    : crypto_(crypto), log_(log), mgmt_(mgmt) {}
 
 se05x::Session &Cli::mgmt() const {
     if (!mgmt_)
@@ -64,7 +64,7 @@ Cli::Args Cli::parse(int argc, char **argv) {
 
 void Cli::usage(const char *prog) {
     std::fprintf(stderr,
-        "Usage: %s [--pkcs11 <lib>] [--port <conn>] <group> <command> [options]\n\n"
+        "Usage: %s [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]\n\n"
         "Commands:\n"
         "  rng <nbytes>\n"
         "  se  uid\n"
@@ -97,18 +97,13 @@ void Cli::writeFile(const std::string &path, const std::vector<uint8_t> &d) {
             static_cast<std::streamsize>(d.size()));
 }
 
-void Cli::printHex(const std::vector<uint8_t> &d) {
-    for (uint8_t b : d) std::printf("%02x", b);
-    std::printf("\n");
-}
-
 void Cli::emit(const Args &a, const std::vector<uint8_t> &d) const {
     const std::string out = a.get("--out");
     if (!out.empty()) {
         writeFile(out, d);
-        std::fprintf(stderr, "[+] wrote %zu bytes to %s\n", d.size(), out.c_str());
+        log_.status("[+] wrote %zu bytes to %s\n", d.size(), out.c_str());
     } else {
-        printHex(d);
+        log_.hex(d);
     }
 }
 
@@ -123,9 +118,9 @@ void Cli::emitText(const Args &a, const std::string &text) const {
     const std::string out = a.get("--out");
     if (!out.empty()) {
         writeFile(out, { text.begin(), text.end() });
-        std::fprintf(stderr, "[+] wrote %s\n", out.c_str());
+        log_.status("[+] wrote %s\n", out.c_str());
     } else {
-        std::fputs(text.c_str(), stdout);
+        log_.print("%s", text.c_str());
     }
 }
 
@@ -156,8 +151,8 @@ int Cli::doRng(const Args &a) {
 int Cli::doSe(const Args &a) {
     if (a.command == "uid") {
         auto uid = se05x::readUid(mgmt());
-        std::printf("UID (%zu bytes): ", uid.size());
-        printHex(uid);
+        log_.print("UID (%zu bytes): ", uid.size());
+        log_.hex(uid);
         return 0;
     }
     throw std::runtime_error("unknown se command: " + a.command);
@@ -172,17 +167,16 @@ int Cli::doRsa(const Args &a) {
 
         if (crypto_.keyExists(id)) {
             if (!a.flag("--force")) {
-                std::fprintf(stderr,
-                    "[i] RSA key 0x%08X already exists (use --force to regenerate)\n", id);
+                log_.status("[i] RSA key 0x%08X already exists (use --force to regenerate)\n", id);
                 emitSpki(a, crypto_.getSpki(id));
                 return 0;
             }
             crypto_.deleteKey(id);
         }
-        std::fprintf(stderr, "[i] RSA-%zu keygen on 0x%08X (~2-4 s)...\n",
-                     static_cast<size_t>(bits), id);
+        log_.status("[i] RSA-%zu keygen on 0x%08X (~2-4 s)...\n",
+                    static_cast<size_t>(bits), id);
         crypto_.generateKey(id, bits);
-        std::fprintf(stderr, "[+] RSA key provisioned\n");
+        log_.status("[+] RSA key provisioned\n");
         emitSpki(a, crypto_.getSpki(id));
         return 0;
     }
@@ -201,7 +195,7 @@ int Cli::doRsa(const Args &a) {
         uint32_t id = parseId(a);
         bool ok     = crypto_.verify(id, readFile(a.get("--in")),
                                          readFile(a.get("--sig")));
-        std::printf("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
+        log_.print("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
         return ok ? 0 : 2;
     }
 
@@ -227,8 +221,8 @@ int Cli::doRsa(const Args &a) {
         uint32_t id = parseId(a);
         auto der    = readFile(a.get("--in"));
         se05x::writeCert(mgmt(), id, der);
-        std::fprintf(stderr, "[+] certificate written (id=0x%08X, %zu bytes)\n",
-                     id, der.size());
+        log_.status("[+] certificate written (id=0x%08X, %zu bytes)\n",
+                    id, der.size());
         return 0;
     }
 
@@ -236,7 +230,7 @@ int Cli::doRsa(const Args &a) {
         const auto certPath = a.get("--cert");
         if (certPath.empty()) throw std::runtime_error("--cert is required");
         bool ok = se05x::verifyBindingRsa(mgmt(), parseId(a), readFile(certPath));
-        std::printf("%s\n", ok ? "BINDING OK" : "BINDING FAILED");
+        log_.print("%s\n", ok ? "BINDING OK" : "BINDING FAILED");
         return ok ? 0 : 2;
     }
 

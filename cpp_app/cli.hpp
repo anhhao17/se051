@@ -16,6 +16,7 @@
 #pragma once
 
 #include "crypto_backend.hpp"
+#include "log.hpp"
 
 #include <map>
 #include <string>
@@ -34,10 +35,12 @@ class Cli {
 public:
     /**
      * @param crypto  Backend that handles all key and crypto operations.
+     * @param log     Output sink (stdout or log file).
      * @param mgmt    SE session for management commands (uid / write-cert /
      *                verify-binding), or nullptr if not needed.
      */
-    explicit Cli(ICryptoBackend &crypto, se05x::Session *mgmt = nullptr);
+    explicit Cli(ICryptoBackend &crypto, Log &log,
+                 se05x::Session *mgmt = nullptr);
 
     /**
      * @brief Parse @p argv and dispatch to the appropriate command handler.
@@ -74,7 +77,6 @@ private:
 
     static std::vector<uint8_t> readFile(const std::string &path);
     static void writeFile(const std::string &path, const std::vector<uint8_t> &d);
-    static void printHex(const std::vector<uint8_t> &d);
     void emit(const Args &a, const std::vector<uint8_t> &d) const;
     void emitSpki(const Args &a, const std::vector<uint8_t> &spki) const;
     void emitText(const Args &a, const std::string &text) const;
@@ -86,5 +88,6 @@ private:
     se05x::Session &mgmt() const;
 
     ICryptoBackend  &crypto_;  ///< backend for all crypto operations
+    Log             &log_;     ///< output sink (stdout or log file)
     se05x::Session  *mgmt_;    ///< nullable — null for pure-crypto invocations
 };

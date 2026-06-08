@@ -16,6 +16,7 @@
 
 #include "cli.hpp"
 #include "crypto_backend.hpp"
+#include "log.hpp"
 
 #include <array>
 #include <cstdio>
@@ -82,6 +83,7 @@ int main(int argc, char **argv) {
     const char *portName = portArg ? portArg : portEnv;
 
     const char *pkcs11Lib = argValue(argc, argv, "--pkcs11");
+    const char *logPath   = argValue(argc, argv, "--log");
 
     auto pre       = preParse(argc, argv);
     bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
@@ -125,7 +127,8 @@ int main(int argc, char **argv) {
 
     int rc = 0;
     try {
-        rc = Cli(*backend, session.get()).run(argc, argv);
+        Log log(logPath);
+        rc = Cli(*backend, log, session.get()).run(argc, argv);
     } catch (const std::exception &e) {
         std::fprintf(stderr, "[!] %s\n", e.what());
         rc = 1;
