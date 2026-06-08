@@ -125,6 +125,48 @@ Key PKCS#11 notes:
 - `CKA_EC_PARAMS` = DER OID of the named curve: `{0x06,0x08,0x2A,0x86,0x48,0xCE,0x3D,0x03,0x01,0x07}` for P-256
 - Demo key uses ID `0xEF000020` (outside the range used by `app/` demo keys)
 
+## Provisioning branch (`feat/privisioning`)
+
+Builds on `feat/pkcs11`. Adds SE-specific provisioning subcommands and structured output logging.
+
+**Current command set** (`cpp_app/`):
+
+```
+se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]
+
+  rng <nbytes>
+  se  uid
+  rsa genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]
+  rsa pub / sign / verify / encrypt / decrypt / csr
+  rsa write-cert     --id <id> --in <cert.der>       # SSS-only
+  rsa verify-binding --id <id> --cert <cert.der>      # SSS-only
+```
+
+**Provisioning subcommands** — all SSS-only; do not accept `--pkcs11`:
+- `se uid` — reads 18-byte chip UID (`se05x::readUid()`)
+- `rsa write-cert` — writes DER cert as binary SE object; idempotent (erase-then-write)
+- `rsa verify-binding` — TRNG nonce → SE sign → mbedTLS verify against cert pubkey
+
+**Idempotent genkey**: checks `se05x::objectExists()` before generating; with an existing key
+and no `--force`, returns existing SPKI and exits 0 cleanly.
+
+**Production key IDs**: default CLI ID is `0xFE000001` (test range).
+Pass `--id 0xF0000001` (key) / `--id 0xF0000002` (cert) for production provisioning objects.
+
+**`--log <file>` logging** (`cpp_app/log.hpp`, `Log` class):
+- Without `--log`: result output (hex, VERIFY OK, PEM, UID) → stdout; status `[i]/[+]/[!]` → stderr.
+- With `--log <file>`: result output → file; status → both stderr and file.
+- `Log(nullptr)` = stdout mode; `Log("path")` = file mode. Non-copyable RAII.
+
+**SCP03 channel conflict prevention**: `preParse()` + `isPkcs11Command()` in `main.cpp`
+determine the backend before any session opens. Only one of SSS or PKCS#11 is ever opened.
+
+**Not yet implemented**: `set-policy` (lock key to sign-only), `rotate-scp03` (per-device
+SCP03 key KDF from UID — irreversible; treat carefully).
+
+**Plan/status**: see `docs/provisioning_plan.md` and `docs/provisioning.md`.
+M1 (build), M2 (PKCS#11), M4 (provisioning cmds) done. M3 (SE mgmt), M5-M6 not yet started.
+
 ## Key ID safe range
 
 Demo keys use IDs in `0xEF000000–0xEFFFFFFF` (the `MAKE_TEST_ID` range per `ex_sss_objid.h`).

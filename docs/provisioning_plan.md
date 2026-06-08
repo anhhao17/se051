@@ -1,4 +1,4 @@
-# Implementation Plan — SE05x RSA-2048 Provisioning System
+# Implementation Plan - SE05x RSA-2048 Provisioning System
 
 Plan to take `se05x_crypto_app` from a working crypto CLI to a complete
 manufacturing provisioning tool: PKCS#11-backed standard crypto, SE-specific
@@ -18,7 +18,7 @@ In scope:
   `libsss_pkcs11.so`; keep a direct SSS path for SE-specific operations.
 - New subcommands: `write-cert`, `verify-binding`, `set-policy`, `rotate-scp03`,
   `uid`, plus an idempotency guard on `genkey`.
-- A provisioning orchestration script chaining phases 0–7 with audit logging.
+- A provisioning orchestration script chaining phases 0-7 with audit logging.
 - CA-hub client (submit CSR, fetch cert) + a local stub CA for testing.
 - Test harness (unit + on-hardware integration + end-to-end) and documentation.
 
@@ -30,32 +30,33 @@ test master), field firmware.
 
 ## 2. Work breakdown & estimates
 
-| ID | Workstream | Tasks | Est. (eng-d) |
-|----|-----------|-------|--------------|
-| WS1 | Build hygiene | `BUILD_ALWAYS ON`, pin mbedTLS config (`MBEDTLS_CMAC_C`), reproducible build, CI smoke build | 0.5–1 |
-| WS2 | PKCS#11 crypto path | Cryptoki init/session/login; map `genkey`, `sign`, `verify`, `encrypt`, `decrypt`, cert read/write to `C_*`; reconcile with existing CSR ASN.1 assembly | 4–6 |
-| WS3 | SE management (SSS) | `set-policy` (sign/dec-only, no-read, no-write, SCP03-required); `rotate-scp03` (KDF from UID) with dry-run + confirm guard | 4–6 |
-| WS4 | Provisioning commands | `uid`; `write-cert`; `verify-binding` (nonce sign → verify w/ cert pubkey); `genkey` reuse guard (idempotent) | 2.5–3.5 |
-| WS5 | CA-hub integration | CSR submit / cert fetch over mTLS; local stub CA (openssl) for tests | 2.5–3.5 |
-| WS6 | Orchestration + audit | Script chaining phases 0–7; per-UID audit log (UID, serial, fingerprint, results); failure handling / resume | 2.5–3.5 |
-| WS7 | Test harness | Unit tests; on-hardware integration suite; end-to-end provisioning test; negative/abuse cases | 3.5–4.5 |
-| WS8 | Documentation | Operator runbook, command reference, troubleshooting, update the design doc | 2–3 |
-| — | **Total** | | **24–35** |
+| ID | Workstream | Tasks | Est. (eng-d) | Status |
+|----|-----------|-------|--------------|--------|
+| WS1 | Build hygiene | `BUILD_ALWAYS ON`, pin mbedTLS config (`MBEDTLS_CMAC_C`), reproducible build, CI smoke build; `--log <file>` output routing | 0.5-1 | **done** |
+| WS2 | PKCS#11 crypto path | Cryptoki init/session/login; `genkey`/`sign`/`verify`/`encrypt`/`decrypt`/`csr`/`rng` via PKCS#11; SCP03 channel conflict prevention; `--pkcs11` flag | 4-6 | **done** |
+| WS3 | SE management (SSS) | `set-policy` (sign/dec-only, no-read, no-write, SCP03-required); `rotate-scp03` (KDF from UID) with dry-run + confirm guard | 4-6 | **not started** |
+| WS4 | Provisioning commands | `se uid`; `rsa write-cert`; `rsa verify-binding` (TRNG nonce → SE sign → mbedTLS verify); `genkey` idempotency guard (`objectExists`, reuse on no `--force`) | 2.5-3.5 | **done** |
+| WS5 | CA-hub integration | CSR submit / cert fetch over mTLS; local stub CA (openssl) for tests | 2.5-3.5 | **not started** |
+| WS6 | Orchestration + audit | Script chaining phases 0-7; per-UID audit log (UID, serial, fingerprint, results); failure handling / resume | 2.5-3.5 | **not started** |
+| WS7 | Test harness | Unit tests; on-hardware integration suite; end-to-end provisioning test; negative/abuse cases | 3.5-4.5 | **not started** |
+| WS8 | Documentation | Operator runbook, command reference, troubleshooting, update the design doc | 2-3 | **in progress** |
+| - | **Total** | | **24-35** | |
 
 Planning figure: **~28 eng-d (≈ 6 weeks)** including buffer and hardware time.
+Completed so far: WS1 + WS2 + WS4 (~8-10.5 eng-d). Remaining: WS3 + WS5 + WS6 + WS7 + WS8 (~15-22 eng-d).
 
 ---
 
 ## 3. Milestones
 
-| Milestone | Contents | Exit criteria |
-|-----------|----------|---------------|
-| M1 — Build stable | WS1 | Clean rebuild always picks up source changes; `rng 16` returns bytes on hardware |
-| M2 — PKCS#11 path | WS2 | `genkey`/`sign`/`verify`/`encrypt`/`decrypt`/`csr` work via PKCS#11; CSR verifies in openssl |
-| M3 — SE management | WS3 | `set-policy` enforced (read/write denied after lock); `rotate-scp03` round-trips on a test part |
-| M4 — Provisioning cmds | WS4 | `write-cert` + `verify-binding` pass on a real issued cert; `genkey` idempotent |
-| M5 — CA + orchestration | WS5, WS6 | One device provisioned end-to-end through the stub CA; audit record written |
-| M6 — Test + docs | WS7, WS8 | Test suite green; runbook complete; pilot run of N units |
+| Milestone | Contents | Exit criteria | Status |
+|-----------|----------|---------------|--------|
+| M1 - Build stable | WS1 | Clean rebuild always picks up source changes; `rng 16` returns bytes on hardware | **done** |
+| M2 - PKCS#11 path | WS2 | `genkey`/`sign`/`verify`/`encrypt`/`decrypt`/`csr`/`rng` work via PKCS#11; CSR verifies in openssl | **done** |
+| M3 - SE management | WS3 | `set-policy` enforced (read/write denied after lock); `rotate-scp03` round-trips on a test part | **not started** |
+| M4 - Provisioning cmds | WS4 | `se uid`; `rsa write-cert` + `rsa verify-binding` pass on a real issued cert; `rsa genkey` idempotent | **done** |
+| M5 - CA + orchestration | WS5, WS6 | One device provisioned end-to-end through the stub CA; audit record written | **not started** |
+| M6 - Test + docs | WS7, WS8 | Test suite green; runbook complete; pilot run of N units | **not started** |
 
 ---
 
@@ -95,7 +96,7 @@ succeeds, audit row complete.
 - CA unreachable → CSR archived, resumable at write-back station.
 
 ### 4.5 Manufacturing dry-run
-Provision a small pilot batch (e.g. 10–20 units) end-to-end; measure per-unit
+Provision a small pilot batch (e.g. 10-20 units) end-to-end; measure per-unit
 keygen time and total takt; confirm audit log integrity and per-UID uniqueness.
 
 ---
