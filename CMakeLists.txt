@@ -63,24 +63,6 @@ ExternalProject_Add(mbedtls
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${BUILD_JOBS}
 )
 
-ExternalProject_Add(app_example
-    DEPENDS    mbedtls
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/app
-    CMAKE_ARGS ${PTMW_COMMON_ARGS}
-    BUILD_COMMAND   ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${BUILD_JOBS}
-    INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> ${_strip_arg}
-    BUILD_ALWAYS    ON
-)
-
-ExternalProject_Add(cpp_app
-    DEPENDS    mbedtls
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cpp_app
-    CMAKE_ARGS ${PTMW_COMMON_ARGS}
-    BUILD_COMMAND   ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${BUILD_JOBS}
-    INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> ${_strip_arg}
-    BUILD_ALWAYS    ON
-)
-
 ExternalProject_Add(pkcs11_lib
     DEPENDS    mbedtls
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pkcs11_lib
@@ -90,21 +72,18 @@ ExternalProject_Add(pkcs11_lib
     BUILD_ALWAYS    ON
 )
 
-ExternalProject_Add(pkcs11_example
-    DEPENDS    pkcs11_lib
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pkcs11_example
-    CMAKE_ARGS ${TOOLCHAIN_ARG}
-               -DCMAKE_INSTALL_PREFIX=${SE05X_STAGE_DIR}
-               -DCMAKE_INSTALL_DO_STRIP=${SE05X_STRIP}
+ExternalProject_Add(cpp_app
+    DEPENDS    mbedtls pkcs11_lib
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cpp_app
+    CMAKE_ARGS ${PTMW_COMMON_ARGS}
+               -DSE05X_PKCS11_DIR=${CMAKE_CURRENT_SOURCE_DIR}/ext/se05x-pkcs11
     BUILD_COMMAND   ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${BUILD_JOBS}
     INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> ${_strip_arg}
     BUILD_ALWAYS    ON
 )
 
 install(PROGRAMS
-    ${SE05X_STAGE_DIR}/${CMAKE_INSTALL_BINDIR}/demo_se051
     ${SE05X_STAGE_DIR}/${CMAKE_INSTALL_BINDIR}/se05x_crypto_app
-    ${SE05X_STAGE_DIR}/${CMAKE_INSTALL_BINDIR}/pkcs11_demo
     DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES
     ${SE05X_STAGE_DIR}/${CMAKE_INSTALL_LIBDIR}/libsss_pkcs11.so
