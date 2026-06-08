@@ -11,6 +11,7 @@
  */
 
 #include "cli.hpp"
+#include "log.hpp"
 #include "se05x_provision.hpp"
 
 #include <cstdio>
@@ -18,8 +19,8 @@
 #include <fstream>
 #include <stdexcept>
 
-Cli::Cli(ICryptoBackend &crypto, Log &log, se05x::Session *mgmt)
-    : crypto_(crypto), log_(log), mgmt_(mgmt) {}
+Cli::Cli(ICryptoBackend &crypto, se05x::Session *mgmt)
+    : crypto_(crypto), mgmt_(mgmt) {}
 
 se05x::Session &Cli::mgmt() const {
     if (!mgmt_)
@@ -101,9 +102,9 @@ void Cli::emit(const Args &a, const std::vector<uint8_t> &d) const {
     const std::string out = a.get("--out");
     if (!out.empty()) {
         writeFile(out, d);
-        log_.status("[+] wrote %zu bytes to %s\n", d.size(), out.c_str());
+        LOG_OK("wrote %zu bytes to %s\n", d.size(), out.c_str());
     } else {
-        log_.hex(d);
+        Log::get().hex(d);
     }
 }
 
@@ -118,9 +119,9 @@ void Cli::emitText(const Args &a, const std::string &text) const {
     const std::string out = a.get("--out");
     if (!out.empty()) {
         writeFile(out, { text.begin(), text.end() });
-        log_.status("[+] wrote %s\n", out.c_str());
+        LOG_OK("wrote %s\n", out.c_str());
     } else {
-        log_.print("%s", text.c_str());
+        Log::get().print("%s", text.c_str());
     }
 }
 
@@ -151,8 +152,8 @@ int Cli::doRng(const Args &a) {
 int Cli::doSe(const Args &a) {
     if (a.command == "uid") {
         auto uid = se05x::readUid(mgmt());
-        log_.print("UID (%zu bytes): ", uid.size());
-        log_.hex(uid);
+        Log::get().print("UID (%zu bytes): ", uid.size());
+        Log::get().hex(uid);
         return 0;
     }
     throw std::runtime_error("unknown se command: " + a.command);
@@ -167,17 +168,19 @@ int Cli::doRsa(const Args &a) {
 
         if (crypto_.keyExists(id)) {
             if (!a.flag("--force")) {
-                log_.status("[i] RSA key 0x%08X already exists (use --force to regenerate)\n", id);
-                emitSpki(a, crypto_.getSpki(id));
+                LOG_INFO("RSA key 0x%08X already exists (use --force to regenerate)\n", id);
+                if (!a.get("--out").empty())
+                    emitSpki(a, crypto_.getSpki(id));
                 return 0;
             }
             crypto_.deleteKey(id);
         }
-        log_.status("[i] RSA-%zu keygen on 0x%08X (~2-4 s)...\n",
-                    static_cast<size_t>(bits), id);
+        LOG_INFO("RSA-%zu keygen on 0x%08X (~2-4 s)...\n",
+                 static_cast<size_t>(bits), id);
         crypto_.generateKey(id, bits);
-        log_.status("[+] RSA key provisioned\n");
-        emitSpki(a, crypto_.getSpki(id));
+        LOG_OK("RSA key provisioned\n");
+        if (!a.get("--out").empty())
+            emitSpki(a, crypto_.getSpki(id));
         return 0;
     }
 
@@ -195,7 +198,7 @@ int Cli::doRsa(const Args &a) {
         uint32_t id = parseId(a);
         bool ok     = crypto_.verify(id, readFile(a.get("--in")),
                                          readFile(a.get("--sig")));
-        log_.print("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
+        Log::get().print("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
         return ok ? 0 : 2;
     }
 
@@ -221,8 +224,7 @@ int Cli::doRsa(const Args &a) {
         uint32_t id = parseId(a);
         auto der    = readFile(a.get("--in"));
         se05x::writeCert(mgmt(), id, der);
-        log_.status("[+] certificate written (id=0x%08X, %zu bytes)\n",
-                    id, der.size());
+        LOG_OK("certificate written (id=0x%08X, %zu bytes)\n", id, der.size());
         return 0;
     }
 
@@ -230,7 +232,7 @@ int Cli::doRsa(const Args &a) {
         const auto certPath = a.get("--cert");
         if (certPath.empty()) throw std::runtime_error("--cert is required");
         bool ok = se05x::verifyBindingRsa(mgmt(), parseId(a), readFile(certPath));
-        log_.print("%s\n", ok ? "BINDING OK" : "BINDING FAILED");
+        Log::get().print("%s\n", ok ? "BINDING OK" : "BINDING FAILED");
         return ok ? 0 : 2;
     }
 

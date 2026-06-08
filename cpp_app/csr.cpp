@@ -4,6 +4,7 @@
 // leaves the SE05x. mbedTLS assembles the ASN.1; the SE produces the signature.
 
 #include "se05x_crypto.hpp"
+#include "log.hpp"
 
 #include <cstring>
 #include <functional>
@@ -146,13 +147,17 @@ std::string assembleCsr(const std::vector<uint8_t> &cri,
 std::string makeCsrImpl(const std::string &subjectDn,
                         const std::vector<uint8_t> &spki,
                         const SignFn &sign) {
+    LOG_DEBUG("csr: building CRI for subject \"%s\"\n", subjectDn.c_str());
     auto cri = buildCri(subjectDn, spki);
 
     std::vector<uint8_t> digest(32);
     if (mbedtls_sha256_ret(cri.data(), cri.size(), digest.data(), 0) != 0)
         throw CryptoError("sha256 over CRI failed");
 
-    return assembleCsr(cri, sign(digest));
+    LOG_DEBUG("csr: signing %zu-byte CRI digest with SE key\n", digest.size());
+    auto csr = assembleCsr(cri, sign(digest));
+    LOG_DEBUG("csr: assembled %zu-byte PEM CSR\n", csr.size());
+    return csr;
 }
 
 } // namespace
@@ -162,8 +167,12 @@ std::string makeCsrImpl(const std::string &subjectDn,
 std::string makeCsrFullSign(const std::string &subjectDn,
                              const std::vector<uint8_t> &spki,
                              std::function<std::vector<uint8_t>(const std::vector<uint8_t>&)> sign) {
+    LOG_DEBUG("csr: building CRI (PKCS#11 path) for subject \"%s\"\n", subjectDn.c_str());
     auto cri = buildCri(subjectDn, spki);
-    return assembleCsr(cri, sign(cri));
+    LOG_DEBUG("csr: signing %zu-byte CRI via PKCS#11\n", cri.size());
+    auto csr = assembleCsr(cri, sign(cri));
+    LOG_DEBUG("csr: assembled %zu-byte PEM CSR\n", csr.size());
+    return csr;
 }
 
 std::string RsaKey::makeCsr(const std::string &subjectDn) {

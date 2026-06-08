@@ -18,6 +18,7 @@
 #include "crypto_backend.hpp"
 #include "log.hpp"
 
+
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -78,12 +79,16 @@ bool isPkcs11Command(const std::string &group, const std::string &cmd) {
 int main(int argc, char **argv) {
     if (argc < 2) { Cli::usage(argv[0]); return 1; }
 
+    const char *logPath   = argValue(argc, argv, "--log");
+    try { Log::init(logPath); } catch (const std::exception &e) {
+        std::fprintf(stderr, "[!] %s\n", e.what()); return 1;
+    }
+
     const char *portEnv  = std::getenv("EX_SSS_BOOT_SSS_PORT");
     const char *portArg  = argValue(argc, argv, "--port");
     const char *portName = portArg ? portArg : portEnv;
 
     const char *pkcs11Lib = argValue(argc, argv, "--pkcs11");
-    const char *logPath   = argValue(argc, argv, "--log");
 
     auto pre       = preParse(argc, argv);
     bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
@@ -101,22 +106,21 @@ int main(int argc, char **argv) {
         try {
             backend = std::make_unique<Pkcs11Backend>(pkcs11Lib);
         } catch (const std::exception &e) {
-            std::fprintf(stderr, "[!] PKCS#11 init failed: %s\n", e.what());
+            LOG_ERROR("PKCS#11 init failed: %s\n", e.what());
             return 1;
         }
     } else {
         sss_status_t st = ex_sss_boot_open(&ctx, portName);
         if (st != kStatus_SSS_Success) {
-            std::fprintf(stderr,
-                "[!] ex_sss_boot_open failed (0x%04x) — set --port or "
-                "$EX_SSS_BOOT_SSS_PORT\n",
-                static_cast<unsigned>(st));
+            LOG_ERROR("ex_sss_boot_open failed (0x%04x) — set --port or "
+                      "$EX_SSS_BOOT_SSS_PORT\n",
+                      static_cast<unsigned>(st));
             return 1;
         }
         st = ex_sss_key_store_and_object_init(&ctx);
         if (st != kStatus_SSS_Success) {
-            std::fprintf(stderr, "[!] key store init failed (0x%04x)\n",
-                         static_cast<unsigned>(st));
+            LOG_ERROR("key store init failed (0x%04x)\n",
+                      static_cast<unsigned>(st));
             ex_sss_session_close(&ctx);
             return 1;
         }
@@ -127,10 +131,9 @@ int main(int argc, char **argv) {
 
     int rc = 0;
     try {
-        Log log(logPath);
-        rc = Cli(*backend, log, session.get()).run(argc, argv);
+        rc = Cli(*backend, session.get()).run(argc, argv);
     } catch (const std::exception &e) {
-        std::fprintf(stderr, "[!] %s\n", e.what());
+        LOG_ERROR("%s\n", e.what());
         rc = 1;
     }
 

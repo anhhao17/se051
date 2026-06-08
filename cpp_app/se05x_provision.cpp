@@ -4,6 +4,7 @@
  */
 
 #include "se05x_provision.hpp"
+#include "log.hpp"
 
 #include <cstring>
 #include <stdexcept>
@@ -32,7 +33,7 @@ std::vector<uint8_t> sha256v(const std::vector<uint8_t> &in) {
 // UID
 
 std::vector<uint8_t> readUid(Session &s) {
-    // SE050_MAX_UID_LEN is 18 bytes per the NXP applet spec.
+    LOG_DEBUG("readUid: requesting 18-byte chip UID\n");
     constexpr size_t kUidLen = 18;
     std::vector<uint8_t> uid(kUidLen);
     size_t uidLen = uid.size();
@@ -60,8 +61,9 @@ bool objectExists(Session &s, uint32_t id) {
 // Binary certificate storage
 
 void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
-    // Erase any prior occupant so the write is idempotent.
+    LOG_DEBUG("writeCert: id=0x%08X, %zu bytes\n", id, der.size());
     if (objectExists(s, id)) {
+        LOG_DEBUG("writeCert: erasing existing object 0x%08X\n", id);
         sss_object_t old{};
         sss_key_object_init(&old, s.keystore());
         sss_key_object_get_handle(&old, id);
@@ -92,14 +94,16 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
 
 bool verifyBindingRsa(Session &s, uint32_t keyId,
                       const std::vector<uint8_t> &certDer) {
-    // 1. Hardware nonce → digest to sign.
+    LOG_DEBUG("verifyBinding: key=0x%08X, cert=%zu bytes\n", keyId, certDer.size());
+
+    LOG_DEBUG("verifyBinding: generating 32-byte TRNG nonce\n");
     auto nonce  = getRandom(s, 32);
     auto digest = sha256v(nonce);
 
-    // 2. Sign with the SE private key (RSASSA-PKCS1-v1_5 / SHA-256).
+    LOG_DEBUG("verifyBinding: signing digest with SE key 0x%08X\n", keyId);
     auto sig = RsaKey::open(s, keyId).sign(digest);
 
-    // 3. Parse the certificate with mbedTLS and verify the signature.
+    LOG_DEBUG("verifyBinding: verifying signature against cert pubkey\n");
     mbedtls_x509_crt crt;
     mbedtls_x509_crt_init(&crt);
     int r = mbedtls_x509_crt_parse_der(&crt, certDer.data(), certDer.size());
@@ -111,6 +115,7 @@ bool verifyBindingRsa(Session &s, uint32_t keyId,
                           digest.data(), digest.size(),
                           sig.data(), sig.size());
     mbedtls_x509_crt_free(&crt);
+    LOG_DEBUG("verifyBinding: mbedTLS result %d (%s)\n", r, r == 0 ? "OK" : "FAIL");
     return (r == 0);
 }
 

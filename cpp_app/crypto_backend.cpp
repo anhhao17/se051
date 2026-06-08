@@ -8,6 +8,7 @@
  */
 
 #include "crypto_backend.hpp"
+#include "log.hpp"
 #include "se05x_provision.hpp"
 
 extern "C" {
@@ -44,6 +45,8 @@ void Pkcs11Backend::deleteKey(uint32_t id) {
 }
 
 void Pkcs11Backend::generateKey(uint32_t id, se05x::RsaBits bits) {
+    LOG_DEBUG("pkcs11: genRsaKeyPair id=0x%08X bits=%lu\n",
+              id, static_cast<unsigned long>(bits));
     ctx_.genRsaKeyPair(id, static_cast<CK_ULONG>(bits));
 }
 
@@ -115,6 +118,8 @@ void SssBackend::deleteKey(uint32_t id) {
 }
 
 void SssBackend::generateKey(uint32_t id, se05x::RsaBits bits) {
+    LOG_DEBUG("sss: RsaKey::generate id=0x%08X bits=%zu\n",
+              id, static_cast<size_t>(bits));
     se05x::RsaKey::generate(session_, id, bits);
 }
 
