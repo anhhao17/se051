@@ -28,3 +28,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 # dlopen/dlsym to load libsss_pkcs11.so at runtime — no link-time dependency.
 target_link_libraries(${PROJECT_NAME} dl)
+
+include(GNUInstallDirs)
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
