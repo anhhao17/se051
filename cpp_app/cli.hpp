@@ -6,10 +6,10 @@
  * and format results for the terminal.  Session and backend lifecycle are external.
  *
  * Cli holds:
- *   crypto_ — ICryptoBackend reference for all crypto operations (genkey, sign,
+ *   crypto_ - ICryptoBackend reference for all crypto operations (genkey, sign,
  *              verify, encrypt, decrypt, csr, rng, pub).  Caller supplies either
  *              a Pkcs11Backend or an SssBackend; Cli never checks which.
- *   mgmt_   — nullable se05x::Session* for management-only operations (se uid,
+ *   mgmt_   - nullable se05x::Session* for management-only operations (se uid,
  *              rsa write-cert, rsa verify-binding) that have no PKCS#11 equivalent.
  */
 
@@ -86,5 +86,5 @@ private:
     se05x::Session &mgmt() const;
 
     ICryptoBackend  &crypto_;  ///< backend for all crypto operations
-    se05x::Session  *mgmt_;    ///< nullable — null for pure-crypto invocations
+    se05x::Session  *mgmt_;    ///< nullable - null for pure-crypto invocations
 };

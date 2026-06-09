@@ -1,8 +1,8 @@
 /*
- * demo_import_object.c — C_CreateObject for AES, generic secret, and EC public key.
+ * demo_import_object.c - C_CreateObject for AES, generic secret, and EC public key.
  *
  * The EC P-256 test key below is a well-known RFC 6979 test vector and is safe for demo
- * purposes only — never use hardcoded keys in production.
+ * purposes only - never use hardcoded keys in production.
  */
 #include "demo_common.h"
 

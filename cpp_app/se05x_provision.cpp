@@ -1,6 +1,6 @@
 /**
  * @file se05x_provision.cpp
- * @brief SE05x provisioning helpers — UID, certificate storage, binding verification.
+ * @brief SE05x provisioning helpers - UID, certificate storage, binding verification.
  */
 
 #include "se05x_provision.hpp"

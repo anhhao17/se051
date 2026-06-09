@@ -1,4 +1,4 @@
-/* demo_digest.c — C_DigestInit / C_Digest for SHA-1/224/256/384/512 */
+/* demo_digest.c - C_DigestInit / C_Digest for SHA-1/224/256/384/512 */
 #include "demo_common.h"
 
 int run_digest(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)

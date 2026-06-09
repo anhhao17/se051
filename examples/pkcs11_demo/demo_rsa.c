@@ -1,5 +1,5 @@
 /*
- * demo_rsa.c — RSA-2048 key pair generation, PKCS#1 v1.5 sign/verify,
+ * demo_rsa.c - RSA-2048 key pair generation, PKCS#1 v1.5 sign/verify,
  *              and PSS sign/verify.
  *
  * Key ID: 0xEF000040.

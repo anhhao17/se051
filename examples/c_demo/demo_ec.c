@@ -240,7 +240,7 @@ sss_status_t demo_ec_csr(ex_sss_boot_ctx_t *pCtx)
     status = sss_key_object_get_handle(&keyPair, DEMO_KEY_EC_ALICE);
     ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-    /* Export public key — SE returns SubjectPublicKeyInfo DER */
+    /* Export public key - SE returns SubjectPublicKeyInfo DER */
     status = sss_key_store_get_key(&pCtx->ks, &keyPair, spki, &spkiLen, &keyBitLen);
     ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
@@ -251,7 +251,7 @@ sss_status_t demo_ec_csr(ex_sss_boot_ctx_t *pCtx)
         mbedtls_asn1_named_data *names = NULL;
         int r;
 
-        /* [0] IMPLICIT {} — empty attributes */
+        /* [0] IMPLICIT {} - empty attributes */
         MBEDTLS_ASN1_CHK_ADD(len, mbedtls_asn1_write_len(&p, cri_buf, 0));
         MBEDTLS_ASN1_CHK_ADD(len,
             mbedtls_asn1_write_tag(&p, cri_buf,
@@ -261,7 +261,7 @@ sss_status_t demo_ec_csr(ex_sss_boot_ctx_t *pCtx)
         MBEDTLS_ASN1_CHK_ADD(len,
             mbedtls_asn1_write_raw_buffer(&p, cri_buf, spki, spkiLen));
 
-        /* Subject Name — parsed and encoded by mbedTLS */
+        /* Subject Name - parsed and encoded by mbedTLS */
         if (mbedtls_x509_string_to_names(&names, "CN=SE051-Demo") != 0) {
             status = kStatus_SSS_Fail;
             goto cleanup;

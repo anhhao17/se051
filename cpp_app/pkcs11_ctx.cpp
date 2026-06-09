@@ -1,6 +1,6 @@
 /**
  * @file pkcs11_ctx.cpp
- * @brief Implementation of Pkcs11Ctx — RAII PKCS#11 session over NXP SE05x.
+ * @brief Implementation of Pkcs11Ctx - RAII PKCS#11 session over NXP SE05x.
  */
 
 #include "pkcs11_ctx.hpp"
@@ -56,7 +56,7 @@ Pkcs11Ctx::Pkcs11Ctx(const std::string &libPath) {
     ckCheck(p11_->C_GetSlotList(CK_TRUE, nullptr, &slotCount),
             "C_GetSlotList (count)");
     if (slotCount == 0)
-        throw Pkcs11Error("No PKCS#11 slots with a token — is the SE connected?");
+        throw Pkcs11Error("No PKCS#11 slots with a token - is the SE connected?");
 
     std::vector<CK_SLOT_ID> slots(slotCount);
     ckCheck(p11_->C_GetSlotList(CK_TRUE, slots.data(), &slotCount),

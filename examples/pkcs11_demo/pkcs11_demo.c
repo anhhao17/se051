@@ -1,19 +1,19 @@
 /*
- * pkcs11_demo.c — SE051 PKCS#11 v2.40 full demo suite
+ * pkcs11_demo.c - SE051 PKCS#11 v2.40 full demo suite
  *
  * Loads libsss_pkcs11.so at runtime via dlopen, opens a session, then runs
  * all demonstration functions covering:
  *
- *   1.  Module info        — library info, slot/token/mechanism enumeration
- *   2.  Hardware RNG       — C_GenerateRandom (1–1024 bytes)
- *   3.  Message digest     — SHA-1/224/256/384/512 via C_DigestInit/C_Digest
- *   4.  Symmetric key gen  — AES-128/192/256 + generic secret (C_GenerateKey)
- *   5.  Object import      — AES, generic secret, EC P-256 public key (C_CreateObject)
- *   6.  ECC sign/verify    — P-256/384/521 keygen + ECDSA sign/verify
- *   7.  RSA sign/verify    — RSA-2048 keygen + PKCS#1 v1.5 + PSS
- *   8.  ECDH derivation    — Two P-256 key pairs + CKM_ECDH1_DERIVE
- *   9.  HMAC               — Import key, SHA-1/256/384/512 HMAC sign/verify
- *  10.  Encrypt/decrypt    — AES-ECB, AES-CBC, RSA-2048 OAEP
+ *   1.  Module info        - library info, slot/token/mechanism enumeration
+ *   2.  Hardware RNG       - C_GenerateRandom (1–1024 bytes)
+ *   3.  Message digest     - SHA-1/224/256/384/512 via C_DigestInit/C_Digest
+ *   4.  Symmetric key gen  - AES-128/192/256 + generic secret (C_GenerateKey)
+ *   5.  Object import      - AES, generic secret, EC P-256 public key (C_CreateObject)
+ *   6.  ECC sign/verify    - P-256/384/521 keygen + ECDSA sign/verify
+ *   7.  RSA sign/verify    - RSA-2048 keygen + PKCS#1 v1.5 + PSS
+ *   8.  ECDH derivation    - Two P-256 key pairs + CKM_ECDH1_DERIVE
+ *   9.  HMAC               - Import key, SHA-1/256/384/512 HMAC sign/verify
+ *  10.  Encrypt/decrypt    - AES-ECB, AES-CBC, RSA-2048 OAEP
  *
  * Usage:
  *   ./pkcs11_demo [/path/to/libsss_pkcs11.so]
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 
     rv = p11->C_GetSlotList(CK_TRUE, NULL_PTR, &slotCount);
     if (rv != CKR_OK || slotCount == 0) {
-        fprintf(stderr, "No PKCS#11 slots with token present — is the SE connected?\n");
+        fprintf(stderr, "No PKCS#11 slots with token present - is the SE connected?\n");
         fprintf(stderr, "C_GetSlotList: rv=0x%08lX count=%lu\n", rv, slotCount);
         rc = 1;
         goto finalize;
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
     printf("Session: %lu\n", session);
 
     /* ------------------------------------------------------------------ */
-    /* Run all demos — continue on individual failures                      */
+    /* Run all demos - continue on individual failures                      */
     /* ------------------------------------------------------------------ */
 
 #define RUN(fn) \

@@ -112,7 +112,7 @@ std::vector<uint8_t> getRandom(Session &s, size_t numBytes);
  *
  * Single responsibility: provide sign, verify, encrypt, decrypt, and CSR
  * generation for one persisted RSA key object.  Does not manage sessions,
- * policies, or certificate storage — those belong to other classes.
+ * policies, or certificate storage - those belong to other classes.
  *
  * Key objects are persistent on the SE.  The destructor does NOT erase the
  * key from SE storage; use eraseKey() or the @c --force flag for that.
@@ -198,7 +198,7 @@ private:
     Session     &s_;
     sss_object_t obj_{};
     size_t       bits_ = 2048;
-    bool         owns_ = false;  ///< false when opened (not generated) — no erase on close
+    bool         owns_ = false;  ///< false when opened (not generated) - no erase on close
 };
 
 /**

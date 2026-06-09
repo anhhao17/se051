@@ -1,4 +1,4 @@
-/* demo_sym_key_gen.c — AES key generation (128/192/256-bit) + generic secret key */
+/* demo_sym_key_gen.c - AES key generation (128/192/256-bit) + generic secret key */
 #include "demo_common.h"
 
 int run_sym_key_gen(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
@@ -41,7 +41,7 @@ int run_sym_key_gen(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
         DESTROY(p11, session, hKey);
     }
 
-    /* Generic secret key — useful as HMAC key material */
+    /* Generic secret key - useful as HMAC key material */
     {
         CK_OBJECT_HANDLE hKey = CK_INVALID_HANDLE;
         static const char kLabel[] = "sss:0xEF0000B3";

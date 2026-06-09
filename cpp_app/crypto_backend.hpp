@@ -4,11 +4,11 @@
  *
  * ICryptoBackend decouples Cli from the underlying crypto path.
  *
- * Pkcs11Backend — libsss_pkcs11.so via dlopen.
+ * Pkcs11Backend - libsss_pkcs11.so via dlopen.
  *   Sign/verify : CKM_SHA256_RSA_PKCS  (SE hashes internally; pass full message)
  *   Enc/dec     : CKM_RSA_PKCS_OAEP / SHA-256 / MGF1-SHA256
  *
- * SssBackend    — NXP SSS API + mbedTLS directly (no PKCS#11 library needed).
+ * SssBackend    - NXP SSS API + mbedTLS directly (no PKCS#11 library needed).
  *   Sign/verify : SHA-256 computed by mbedTLS, digest signed by SE
  *   Enc/dec     : RSA-OAEP-SHA256 via sss_asymmetric
  *
@@ -87,7 +87,7 @@ public:
 };
 
 /**
- * @brief PKCS#11 backend — all operations through @c libsss_pkcs11.so.
+ * @brief PKCS#11 backend - all operations through @c libsss_pkcs11.so.
  */
 class Pkcs11Backend final : public ICryptoBackend {
 public:
@@ -114,7 +114,7 @@ private:
 };
 
 /**
- * @brief SSS + mbedTLS backend — no PKCS#11 library required.
+ * @brief SSS + mbedTLS backend - no PKCS#11 library required.
  *
  * @note The Session must outlive this object.
  */

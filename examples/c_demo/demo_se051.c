@@ -22,7 +22,7 @@ sss_status_t ex_sss_entry(ex_sss_boot_ctx_t *pCtx)
 {
     sss_status_t status = kStatus_SSS_Success;
 
-    LOG_I("SE051 Crypto Demo — starting");
+    LOG_I("SE051 Crypto Demo - starting");
 
     RUN(demo_rng(pCtx),             "RNG");
     RUN(demo_ec_keygen(pCtx),       "EC keygen");
@@ -35,10 +35,10 @@ sss_status_t ex_sss_entry(ex_sss_boot_ctx_t *pCtx)
     RUN(demo_rsa_csr(pCtx),         "RSA CSR");
 
     LOG_I("============================================");
-    LOG_I("SE051 Crypto Demo — ALL DEMOS PASSED");
+    LOG_I("SE051 Crypto Demo - ALL DEMOS PASSED");
 
 cleanup:
     if (status != kStatus_SSS_Success)
-        LOG_E("SE051 Crypto Demo — FAILED");
+        LOG_E("SE051 Crypto Demo - FAILED");
     return status;
 }

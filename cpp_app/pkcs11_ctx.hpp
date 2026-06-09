@@ -17,7 +17,7 @@
  *   @c 0xXXXXXXXX.  Use Pkcs11Ctx::label() to format an ID.
  *
  * Signature format note:
- *   signRsa()  uses CKM_SHA256_RSA_PKCS — the SE performs SHA-256 hashing
+ *   signRsa()  uses CKM_SHA256_RSA_PKCS - the SE performs SHA-256 hashing
  *   internally.  The returned bytes are a raw PKCS#1 v1.5 RSA signature.
  *   verifyRsa() expects the same format.
  *   This means sign() / verify() both take the *full message*, not a digest.

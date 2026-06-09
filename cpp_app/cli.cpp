@@ -2,7 +2,7 @@
  * @file cli.cpp
  * @brief Cli method implementations.
  *
- * All crypto commands delegate to ICryptoBackend — there is no backend-specific
+ * All crypto commands delegate to ICryptoBackend - there is no backend-specific
  * branching here.  The caller (main.cpp) selects the concrete backend.
  *
  * SE management commands (se uid, rsa write-cert, rsa verify-binding) use the

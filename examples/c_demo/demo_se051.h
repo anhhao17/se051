@@ -7,8 +7,8 @@
 #include <nxLog_App.h>
 
 /* ---- Key object IDs (demo range 0xEF000xxx, safe per ex_sss_objid.h) ------- */
-#define DEMO_KEY_EC_ALICE   0xEF000001u  /* EC P-256 key pair  — sign / verify / CSR */
-#define DEMO_KEY_EC_BOB     0xEF000002u  /* EC P-256 key pair  — ECDH peer            */
+#define DEMO_KEY_EC_ALICE   0xEF000001u  /* EC P-256 key pair  - sign / verify / CSR */
+#define DEMO_KEY_EC_BOB     0xEF000002u  /* EC P-256 key pair  - ECDH peer            */
 #define DEMO_KEY_EC_SHARED  0xEF000003u  /* ECDH derived shared secret                */
 #define DEMO_KEY_RSA        0xEF000010u  /* RSA 2048 CRT key pair                     */
 

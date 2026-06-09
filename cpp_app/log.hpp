@@ -19,7 +19,7 @@
  * Two output streams:
  *   Status/diagnostic (LOG_*): timestamped lines with source location.
  *     Always go to stderr; also written to the log file when --log is active.
- *   Result data (Log::get().print() / .hex()): raw output — hex, PEM,
+ *   Result data (Log::get().print() / .hex()): raw output - hex, PEM,
  *     "VERIFY OK", UID.  Goes to the log file, or stdout if no --log.
  *     No timestamp or location prefix so the output stays machine-readable.
  *
@@ -69,7 +69,7 @@ public:
         va_end(b);
     }
 
-    /** Result data output — no timestamp or location prefix. */
+    /** Result data output - no timestamp or location prefix. */
     void print(const char *fmt, ...) {
         va_list ap; va_start(ap, fmt);
         std::vfprintf(f_, fmt, ap); va_end(ap);

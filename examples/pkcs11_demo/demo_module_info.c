@@ -1,4 +1,4 @@
-/* demo_module_info.c — C_GetInfo, slot/token info, mechanism list, object enumeration */
+/* demo_module_info.c - C_GetInfo, slot/token info, mechanism list, object enumeration */
 #include "demo_common.h"
 
 int run_module_info(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
@@ -27,7 +27,7 @@ int run_module_info(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
     printf("  Slots w/token: %lu\n", tokenSlotCount);
 
     if (tokenSlotCount == 0) {
-        printf("  (no token present — is the SE connected?)\n");
+        printf("  (no token present - is the SE connected?)\n");
         goto cleanup;
     }
 

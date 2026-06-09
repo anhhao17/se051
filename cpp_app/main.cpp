@@ -7,10 +7,10 @@
  * channel was opened first, causing APDU errors (0x6982) on the stale session.
  *
  * Resolution: pre-parse the command group/name and open EITHER the SSS session
- * OR the PKCS#11 context — never both:
+ * OR the PKCS#11 context - never both:
  *
- *   Pkcs11Backend  — rng, rsa genkey/pub/sign/verify/encrypt/decrypt/csr  (+--pkcs11)
- *   SssBackend     — everything else (se uid, rsa write-cert / verify-binding,
+ *   Pkcs11Backend  - rng, rsa genkey/pub/sign/verify/encrypt/decrypt/csr  (+--pkcs11)
+ *   SssBackend     - everything else (se uid, rsa write-cert / verify-binding,
  *                    and any rsa command without --pkcs11)
  */
 
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     } else {
         sss_status_t st = ex_sss_boot_open(&ctx, portName);
         if (st != kStatus_SSS_Success) {
-            LOG_ERROR("ex_sss_boot_open failed (0x%04x) — set --port or "
+            LOG_ERROR("ex_sss_boot_open failed (0x%04x) - set --port or "
                       "$EX_SSS_BOOT_SSS_PORT\n",
                       static_cast<unsigned>(st));
             return 1;
