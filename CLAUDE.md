@@ -254,8 +254,7 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] [--debug] <grou
   and run on hardware. Covers rng, uid, genkey (force/idempotent), pub (DER/PEM), sign, verify
   (good/tampered), csr, write-cert, verify-binding, write/read/verify-info round-trip, rotate-scp03
   `--dry-run`.
-- **Plan/status**: `docs/provisioning.md`, `docs/provisioning_plan.md`. M1–M4 + rotate-scp03 done;
-  M5–M6 (CA integration, orchestration) not started.
+- **Overview**: `docs/about.md` — plain-language description of the SE05x and what this tool does.
 
 ## Key ID safe range
 

@@ -5,6 +5,13 @@ CLI for Linux ARM targets (Raspberry Pi and similar, T=1 over I2C), using **NXP 
 (SSS API) with **mbedTLS 2.28 LTS** as the host crypto backend and the **NXP se05x-pkcs11**
 module for a standard PKCS#11 interface.
 
+The **SE05x** is a tamper-resistant secure element that holds an IoT device's identity key
+inside certified hardware — the private key is generated on-chip and never leaves it, so even
+a fully compromised host cannot extract it. This tool provisions that identity at
+manufacturing (on-chip keygen → CSR → leaf cert) and exposes the key for runtime mutual-TLS
+via PKCS#11. For a plain-language overview of the chip and what this tool does, see
+[`docs/about.md`](docs/about.md).
+
 ## What the superbuild produces
 
 The top-level `CMakeLists.txt` orchestrates three sub-builds in order:
@@ -25,31 +32,36 @@ or `libsss_pkcs11.so` via `--pkcs11`. Only one secure channel is opened per invo
 (SE05x allows only one Platform SCP03 channel at a time).
 
 ```
-se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]
+se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] [--debug] <group> <cmd> [opts]
 
   rng <nbytes>
   se  uid
-  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]
+  se  write-info     (--data <text> | --data-hex <hex>) [--id <hex>=0xFE000010] [--force]
+  se  read-info      [--id <hex>=0xFE000010] [--out <file>]
+  se  verify-info    (--data <text> | --data-hex <hex>) [--id <hex>=0xFE000010]
+  se  rotate-scp03   --enc <hex32> --mac <hex32> --dek <hex32>
+                     (--dry-run | --confirm) [--key-out <file>]   # ISD session; IRREVERSIBLE
+  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096]
+                     [--policy full|sign-only|sign-decrypt] [--force] [--out <file>]
   rsa pub            [--id <hex>] [--out <file>] [--pem]
   rsa sign           [--id <hex>] --in <file>  [--out <file>]
   rsa verify         [--id <hex>] --in <file>  --sig <file>
-  rsa encrypt        [--id <hex>] --in <file>  [--out <file>]
-  rsa decrypt        [--id <hex>] --in <file>  [--out <file>]
-  rsa csr            [--id <hex>] --subject "CN=...,O=..."
+  rsa csr            [--id <hex>] --subject "CN=...,O=..." [--out <file>]
   rsa write-cert     [--id <hex>] --in <cert.der>     (SSS only)
   rsa verify-binding [--id <hex>] --cert <cert.der>   (SSS only)
 ```
 
-- `--pkcs11 <lib>` routes standard crypto through `libsss_pkcs11.so`
-  (`CKM_SHA256_RSA_PKCS`, `CKM_RSA_PKCS_OAEP`). Without it, SSS + mbedTLS are used directly.
-- `se uid`, `rsa write-cert`, `rsa verify-binding` always use SSS and reject `--pkcs11`.
+- `--pkcs11 <lib>` routes standard crypto (`genkey`, `sign`, `verify`, `csr`, `rng`) through
+  `libsss_pkcs11.so` (`CKM_SHA256_RSA_PKCS`). Without it, SSS + mbedTLS are used directly.
+- `se` commands, `rsa write-cert`, and `rsa verify-binding` always use SSS and reject
+  `--pkcs11`. `se rotate-scp03` opens an ISD session (applet not selected) and is
+  **irreversible** — it requires `--confirm`; `--dry-run` builds the APDU without sending it.
 - `--log <file>` redirects result output (hex, PEM, `VERIFY OK`, UID) to a file;
   timestamped status lines (`[i]/[+]/[!]`) always go to stderr. Without `--log`, result
-  output goes to stdout.
+  output goes to stdout. `--debug` (or `--verbose`) raises log verbosity to DEBUG.
 - Connect string via `--port` or `$EX_SSS_BOOT_SSS_PORT` (e.g. `/dev/i2c-1:0x48`).
 
-Provisioning design and milestones live in [`docs/provisioning.md`](docs/provisioning.md) and
-[`docs/provisioning_plan.md`](docs/provisioning_plan.md).
+An overview of the chip and what this tool does lives in [`docs/about.md`](docs/about.md).
 
 ## Prerequisites
 
@@ -109,27 +121,6 @@ sets `CMAKE_BUILD_TYPE=Release` for both app sub-builds to avoid that.
 **Clean rebuild** after a submodule version change: `rm -rf build` - ExternalProject stamp
 caching will not otherwise detect the source change.
 
-## Running
-
-Copy the binary (and the PKCS#11 module, if used) to the target:
-
-```bash
-scp build/stage/bin/se05x_crypto_app pi@<host>:/home/pi/
-scp build/stage/lib/libsss_pkcs11.so  pi@<host>:/home/pi/
-
-# 32 random bytes from the SE TRNG
-ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
-
-# Provision an RSA-2048 identity key (idempotent) and emit a CSR
-./se05x_crypto_app --port /dev/i2c-1:0x48 rsa genkey --id 0xFE000001 --bits 2048
-./se05x_crypto_app --port /dev/i2c-1:0x48 rsa csr --id 0xFE000001 \
-    --subject "CN=device-001,O=Acme" --out /home/pi/dev.csr
-
-# Same crypto via the PKCS#11 module
-./se05x_crypto_app --pkcs11 ./libsss_pkcs11.so --port /dev/i2c-1:0x48 rsa sign \
-    --id 0xFE000001 --in payload.bin --out payload.sig
-```
-
 ## Project structure
 
 ```
@@ -138,13 +129,20 @@ ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
 ├── armhf-toolchain.cmake    # Cross-toolchain for 32-bit ARM hard-float
 ├── aarch64-toolchain.cmake  # Cross-toolchain for 64-bit ARM
 ├── cpp_app/                 # se05x_crypto_app - RSA provisioning CLI
-│   ├── main.cpp             # Backend selection + session lifecycle
-│   ├── cli.cpp/.hpp         # Arg parsing and command dispatch
+│   ├── main.cpp             # Backend selection + session lifecycle (by SessionNeed)
+│   ├── cli.cpp/.hpp         # Arg parsing (parseArgs → Args)
+│   ├── command.hpp          # Command base, Args, SessionNeed, CommandContext
+│   ├── commands.*           # Concrete Command subclasses + CommandRegistry
+│   ├── output.*             # OutputWriter: result / file emission
 │   ├── crypto_backend.*     # ICryptoBackend: Pkcs11Backend / SssBackend
 │   ├── se05x_crypto.*       # RsaKey + Session SSS RAII wrappers
-│   ├── se05x_provision.*    # UID, cert storage, key↔cert binding check
+│   ├── se05x_provision.*    # UID, cert/binary storage, key↔cert binding check
+│   ├── scp03_rotate.*       # Platform SCP03 key rotation (GP PUT KEY over ISD)
+│   ├── scp03_keyfile.*      # ENC/MAC/DEK key-file read + atomic write-back
 │   ├── pkcs11_ctx.*         # RAII PKCS#11 session (dlopen)
 │   ├── csr.cpp              # PKCS#10 CSR builder (mbedTLS ASN.1)
+│   ├── sw_decode.hpp        # APDU status-word → human-readable string
+│   ├── keys.hpp             # SE object-ID constants
 │   └── log.hpp              # Global timestamped logger (LOG_* macros)
 ├── pkcs11_lib/              # Builds libsss_pkcs11.so (OpenSSL → mbedTLS swap)
 ├── docs/                    # Provisioning design + implementation plan
@@ -161,9 +159,9 @@ ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
 
 | ID | Purpose |
 |---|---|
-| `0xFE000001` | CLI default RSA key |
-| `0xFE000001` | Production device identity RSA key |
-| `0xFE000002` | Production device leaf certificate (DER) |
+| `0xFE000001` | Device identity RSA key (CLI default for `rsa` commands) |
+| `0xFE000002` | Device leaf certificate (DER) |
+| `0xFE000010` | Device-info blob (CLI default for `se write/read/verify-info`) |
 
 Demo/reference keys in `examples/` use the `0xEF000000-0xEFFFFFFF` test range and are erased
 before each run. `rsa genkey` is idempotent: an existing key is reused unless `--force` is given.
