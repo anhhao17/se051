@@ -115,11 +115,7 @@ int main(int argc, char *argv[])
     RUN(run_digest);
     RUN(run_sym_key_gen);
     RUN(run_import_object);
-    RUN(run_ecc);
     RUN(run_rsa);
-    RUN(run_ecdh_derive);
-    RUN(run_hmac);
-    RUN(run_encrypt_decrypt);
 
 #undef RUN
 

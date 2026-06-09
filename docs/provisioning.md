@@ -169,15 +169,24 @@ per unit. Engineer around it:
 
 | Phase | Command | Status |
 |-------|---------|--------|
-| 2 | `rsa genkey --id 0xF0000001 --bits 2048` | exists (add reuse guard) |
-| 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | exists (auto-insert UID) |
-| 5 | `write-cert --id 0xF0000002 --in leaf.der` | to build |
-| 5 | `verify-binding --key 0xF0000001 --cert 0xF0000002` | to build |
-| 6 | `set-policy --id 0xF0000001 --sign-only --no-read --no-write` | to build |
-| 1 | `rotate-scp03` (KDF from UID) | to build - irreversible, handle carefully |
+| 0 | `se uid` | **done** |
+| 2 | `rsa genkey --id 0xF0000001 --bits 2048 [--force]` | **done** — idempotent; reuses existing key unless `--force` |
+| 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | **done** — `sha256WithRSAEncryption` PKCS#1 v1.5 |
+| 5 | `rsa write-cert --id 0xF0000002 --in leaf.der` | **done** — SSS-only; idempotent erase-then-write |
+| 5 | `rsa verify-binding --id 0xF0000001 --cert leaf.der` | **done** — TRNG nonce → SE sign → mbedTLS verify |
+| 6 | `set-policy --id 0xF0000001 --sign-only --no-read --no-write` | **not yet** |
+| 1 | `rotate-scp03` (KDF from UID) | **not yet** — irreversible, handle carefully |
 
-CSR signing already uses `sha256WithRSAEncryption` (PKCS#1 v1.5), the universal
-CA default.
+Standard crypto (genkey, sign, verify, encrypt, decrypt, csr, rng) is routed
+through PKCS#11 when `--pkcs11 <lib>` is given.  Management commands
+(`se uid`, `rsa write-cert`, `rsa verify-binding`) always use the direct SSS
+path and do not accept `--pkcs11`.
+
+Default key ID in the CLI is `0xFE000001` (demo/test range).  Explicitly pass
+`--id 0xF0000001` / `--id 0xF0000002` for production objects.
+
+Output goes to stdout by default; `--log <file>` redirects result output to a
+file while status lines continue to stderr.
 
 ---
 
@@ -260,17 +269,29 @@ fetching updates) without copying the key to the filesystem.
 The CLI used across the provisioning phases:
 
 ```
-se05x_crypto_app [--port <conn>] <group> <command> [options]
+se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]
 
   rng    <nbytes>
-  ecc    genkey | pub | sign | verify | ecdh | csr
-  rsa    genkey | pub | sign | verify | encrypt | decrypt | csr
+  se     uid
+  rsa    genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]
+  rsa    pub    [--id <hex>] [--out <file>] [--pem]
+  rsa    sign   [--id <hex>] --in <file>  [--out <file>]
+  rsa    verify [--id <hex>] --in <file>  --sig <file>
+  rsa    encrypt/decrypt  [--id <hex>] --in <file> [--out <file>]
+  rsa    csr    [--id <hex>] --subject "CN=..."
 
-  Provisioning-specific (to build):
-  write-cert      --id 0xF0000002 --in leaf.der
-  verify-binding  --key 0xF0000001 --cert 0xF0000002
-  set-policy      --id 0xF0000001 --sign-only --no-read --no-write
-  rotate-scp03    (derive per-device keys from UID)
+  Provisioning (SSS-only, no --pkcs11):
+  rsa    write-cert      --id 0xF0000002  --in leaf.der
+  rsa    verify-binding  --id 0xF0000001  --cert leaf.der
+
+  Not yet implemented:
+  rsa    set-policy      --id 0xF0000001 --sign-only --no-read --no-write
+         rotate-scp03    (derive per-device keys from UID; irreversible)
 ```
 
+`--pkcs11` routes standard crypto through `libsss_pkcs11.so` (PKCS#11 CKM_SHA256_RSA_PKCS
+/ CKM_RSA_PKCS_OAEP); without it, the SSS + mbedTLS path is used directly.
+Only one session is opened per invocation (SCP03 channel conflict prevention).
+
 Connect string via `--port` or `EX_SSS_BOOT_SSS_PORT` (e.g. `/dev/i2c-3:0x48`).
+`--log <file>` redirects result output to a file; status lines always go to stderr.
