@@ -35,12 +35,14 @@ namespace {
 /** @brief Return the value following @p flag in argv, or nullptr. */
 const char *argValue(int argc, char **argv, const char *flag) {
     for (int i = 1; i + 1 < argc; ++i)
-        if (std::strcmp(argv[i], flag) == 0) return argv[i + 1];
+        if (std::strcmp(argv[i], flag) == 0)
+            return argv[i + 1];
     return nullptr;
 }
 bool hasFlag(int argc, char **argv, const char *flag) {
     for (int i = 1; i < argc; ++i)
-        if (std::strcmp(argv[i], flag) == 0) return true;
+        if (std::strcmp(argv[i], flag) == 0)
+            return true;
     return false;
 }
 } // namespace
@@ -52,7 +54,7 @@ int main(int argc, char **argv) {
     }
 
     const char *logPath = argValue(argc, argv, "--log");
-    const bool  debug   = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "--verbose");
+    const bool debug = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "--verbose");
     try {
         Log::init(logPath, debug ? Log::DEBUG : Log::INFO);
     } catch (const std::exception &e) {
@@ -61,7 +63,7 @@ int main(int argc, char **argv) {
     }
 
     CommandRegistry registry;
-    Args            a = parseArgs(argc, argv);
+    Args a = parseArgs(argc, argv);
     if (a.group.empty()) {
         registry.usage(argv[0]);
         return 1;
@@ -75,21 +77,22 @@ int main(int argc, char **argv) {
     }
 
     const char *portName = argValue(argc, argv, "--port");
-    if (!portName) portName = std::getenv("EX_SSS_BOOT_SSS_PORT");
+    if (!portName)
+        portName = std::getenv("EX_SSS_BOOT_SSS_PORT");
     const char *pkcs11Lib = argValue(argc, argv, "--pkcs11");
 
-    const SessionNeed need      = cmd->sessionNeed();
-    const bool        usePkcs11 = pkcs11Lib && need == SessionNeed::Crypto;
+    const SessionNeed need = cmd->sessionNeed();
+    const bool usePkcs11 = pkcs11Lib && need == SessionNeed::Crypto;
 
     LOG_DEBUG("dispatch: %s %s (session=%s)\n", a.group.c_str(), a.command.c_str(),
               usePkcs11 ? "PKCS#11"
                         : (need == SessionNeed::Isd ? "SSS/ISD (applet skipped)" : "SSS (applet)"));
 
-    ex_sss_boot_ctx_t               ctx{};
-    bool                            sssOpened = false;
+    ex_sss_boot_ctx_t ctx{};
+    bool sssOpened = false;
     std::unique_ptr<se05x::Session> session;
     std::unique_ptr<ICryptoBackend> backend;
-    OutputWriter                    out;
+    OutputWriter out;
 
     if (usePkcs11) {
         try {
@@ -100,7 +103,8 @@ int main(int argc, char **argv) {
         }
     } else {
         // Rotation targets the ISD; everything else uses the applet.
-        if (need == SessionNeed::Isd) ctx.se05x_open_ctx.skip_select_applet = 1;
+        if (need == SessionNeed::Isd)
+            ctx.se05x_open_ctx.skip_select_applet = 1;
 
         sss_status_t st = ex_sss_boot_open(&ctx, portName);
         if (st != kStatus_SSS_Success) {
@@ -116,12 +120,12 @@ int main(int argc, char **argv) {
             return 1;
         }
         sssOpened = true;
-        session   = std::make_unique<se05x::Session>(&ctx);
-        backend   = std::make_unique<SssBackend>(*session);
+        session = std::make_unique<se05x::Session>(&ctx);
+        backend = std::make_unique<SssBackend>(*session);
     }
 
     CommandContext cctx{*backend, session.get(), out};
-    int            rc = 0;
+    int rc = 0;
     try {
         rc = cmd->run(cctx, a);
     } catch (const std::exception &e) {
@@ -129,6 +133,7 @@ int main(int argc, char **argv) {
         rc = 1;
     }
 
-    if (sssOpened) ex_sss_session_close(&ctx);
+    if (sssOpened)
+        ex_sss_session_close(&ctx);
     return rc;
 }

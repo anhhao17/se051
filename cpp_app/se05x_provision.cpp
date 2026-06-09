@@ -30,16 +30,36 @@ std::vector<uint8_t> sha256v(const std::vector<uint8_t> &in) {
     return out;
 }
 
+void eraseObject(Session &s, uint32_t id) {
+    sss_object_t obj{};
+    sss_key_object_init(&obj, s.keystore());
+    sss_key_object_get_handle(&obj, id);
+    sss_key_store_erase_key(s.keystore(), &obj);
+    sss_key_object_free(&obj);
+}
+
+void storeBinaryObject(Session &s, uint32_t id, const std::vector<uint8_t> &data, const char *tag) {
+    sss_object_t obj{};
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init");
+    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default, kSSS_CipherType_Binary,
+                                         data.size(), kKeyObject_Mode_Persistent),
+          tag);
+    check(sss_key_store_set_key(s.keystore(), &obj, data.data(), data.size(), data.size() * 8,
+                                nullptr, 0),
+          tag);
+    sss_key_object_free(&obj);
+}
+
 } // namespace
 
 // UID
 
 std::vector<uint8_t> readUid(Session &s) {
     LOG_DEBUG("readUid: requesting 18-byte chip UID\n");
-    constexpr size_t     kUidLen = 18;
+    constexpr size_t kUidLen = 18;
     std::vector<uint8_t> uid(kUidLen);
-    size_t               uidLen = uid.size();
-    sss_status_t         st =
+    size_t uidLen = uid.size();
+    sss_status_t st =
         sss_session_prop_get_au8(s.session(), kSSS_SessionProp_UID, uid.data(), &uidLen);
     if (st != kStatus_SSS_Success)
         throw CryptoError("readUid failed (0x6982 = SCP03 not established; "
@@ -53,38 +73,25 @@ std::vector<uint8_t> readUid(Session &s) {
 
 bool objectExists(Session &s, uint32_t id) {
     sss_object_t obj{};
-    if (sss_key_object_init(&obj, s.keystore()) != kStatus_SSS_Success) return false;
+    if (sss_key_object_init(&obj, s.keystore()) != kStatus_SSS_Success)
+        return false;
     sss_status_t st = sss_key_object_get_handle(&obj, id);
     sss_key_object_free(&obj);
     return (st == kStatus_SSS_Success);
 }
 
-// Binary certificate storage
+// Binary certificate storage (always overwrites; idempotent erase-then-write).
 
 void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
     LOG_DEBUG("writeCert: id=0x%08X, %zu bytes\n", id, der.size());
     if (objectExists(s, id)) {
         LOG_DEBUG("writeCert: erasing existing object 0x%08X\n", id);
-        sss_object_t old{};
-        sss_key_object_init(&old, s.keystore());
-        sss_key_object_get_handle(&old, id);
-        sss_key_store_erase_key(s.keystore(), &old);
-        sss_key_object_free(&old);
+        eraseObject(s, id);
     }
-
-    sss_object_t obj{};
-    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init");
-    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default,
-                                         kSSS_CipherType_Binary, der.size(),
-                                         kKeyObject_Mode_Persistent),
-          "sss_key_object_allocate_handle(cert)");
-    check(sss_key_store_set_key(s.keystore(), &obj, der.data(), der.size(),
-                                der.size() * 8, nullptr, 0),
-          "sss_key_store_set_key(cert)");
-    sss_key_object_free(&obj);
+    storeBinaryObject(s, id, der, "sss_key_object_allocate_handle(cert)");
 }
 
-// Plain binary object storage (no object policy - rewritable).
+// Plain binary object storage; returns false (no-op) if the object exists and force is false.
 
 bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool force) {
     LOG_DEBUG("writeBinary: id=0x%08X, %zu bytes, force=%d\n", id, data.size(), force);
@@ -94,23 +101,9 @@ bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool
             return false;
         }
         LOG_DEBUG("writeBinary: erasing existing object 0x%08X\n", id);
-        sss_object_t old{};
-        sss_key_object_init(&old, s.keystore());
-        sss_key_object_get_handle(&old, id);
-        sss_key_store_erase_key(s.keystore(), &old);
-        sss_key_object_free(&old);
+        eraseObject(s, id);
     }
-
-    sss_object_t obj{};
-    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init(bin)");
-    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default,
-                                         kSSS_CipherType_Binary, data.size(),
-                                         kKeyObject_Mode_Persistent),
-          "sss_key_object_allocate_handle(bin)");
-    check(sss_key_store_set_key(s.keystore(), &obj, data.data(), data.size(),
-                                data.size() * 8, nullptr, 0),
-          "sss_key_store_set_key(bin)");
-    sss_key_object_free(&obj);
+    storeBinaryObject(s, id, data, "sss_key_object_allocate_handle(bin)");
     return true;
 }
 
@@ -123,9 +116,9 @@ std::vector<uint8_t> readBinary(Session &s, uint32_t id) {
         throw CryptoError("readBinary: object not found", kStatus_SSS_Fail);
     }
     std::vector<uint8_t> buf(2048);
-    size_t               len    = buf.size();
-    size_t               bitLen = buf.size() * 8;
-    sss_status_t         st     = sss_key_store_get_key(s.keystore(), &obj, buf.data(), &len, &bitLen);
+    size_t len = buf.size();
+    size_t bitLen = buf.size() * 8;
+    sss_status_t st = sss_key_store_get_key(s.keystore(), &obj, buf.data(), &len, &bitLen);
     sss_key_object_free(&obj);
     check(st, "sss_key_store_get_key(bin)");
     buf.resize(len);
@@ -138,7 +131,7 @@ bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &ce
     LOG_DEBUG("verifyBinding: key=0x%08X, cert=%zu bytes\n", keyId, certDer.size());
 
     LOG_DEBUG("verifyBinding: generating 32-byte TRNG nonce\n");
-    auto nonce  = getRandom(s, 32);
+    auto nonce = getRandom(s, 32);
     auto digest = sha256v(nonce);
 
     LOG_DEBUG("verifyBinding: signing digest with SE key 0x%08X\n", keyId);
@@ -152,8 +145,8 @@ bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &ce
         mbedtls_x509_crt_free(&crt);
         throw std::runtime_error("verifyBindingRsa: cannot parse certificate");
     }
-    r = mbedtls_pk_verify(&crt.pk, MBEDTLS_MD_SHA256, digest.data(), digest.size(),
-                          sig.data(), sig.size());
+    r = mbedtls_pk_verify(&crt.pk, MBEDTLS_MD_SHA256, digest.data(), digest.size(), sig.data(),
+                          sig.size());
     mbedtls_x509_crt_free(&crt);
     LOG_DEBUG("verifyBinding: mbedTLS result %d (%s)\n", r, r == 0 ? "OK" : "FAIL");
     return (r == 0);
@@ -172,25 +165,25 @@ RsaKey generateKeyWithPolicy(Session &s, uint32_t keyId, RsaBits bits, KeyPolicy
     //   - Asym "old policies" (can_Read, can_Write) are silently ignored on 07.02
 
     sss_policy_u asymPol{};
-    asymPol.type                        = KPolicy_Asym_Key;
-    asymPol.auth_obj_id                 = 0;
-    asymPol.policy.asymmkey.can_Sign    = 1;
+    asymPol.type = KPolicy_Asym_Key;
+    asymPol.auth_obj_id = 0;
+    asymPol.policy.asymmkey.can_Sign = 1;
     asymPol.policy.asymmkey.can_Decrypt = (policy == KeyPolicy::SignDecrypt) ? 1 : 0;
-    asymPol.policy.asymmkey.can_Gen     = 1; // needed for on-chip generation
+    asymPol.policy.asymmkey.can_Gen = 1; // needed for on-chip generation
     // can_Import_Export = 0  ->  private key cannot be exported
 
     sss_policy_u commonPol{};
-    commonPol.type                     = KPolicy_Common;
-    commonPol.auth_obj_id              = 0;
-    commonPol.policy.common.can_Read   = 1; // allow public key read (needed for CSR / rsa pub)
-    commonPol.policy.common.can_Write  = 0; // prevent overwriting key material after creation
+    commonPol.type = KPolicy_Common;
+    commonPol.auth_obj_id = 0;
+    commonPol.policy.common.can_Read = 1;   // allow public key read (needed for CSR / rsa pub)
+    commonPol.policy.common.can_Write = 0;  // prevent overwriting key material after creation
     commonPol.policy.common.can_Delete = 0; // non-deletable once provisioned
-    commonPol.policy.common.req_Sm     = 1; // all operations require SCP03
+    commonPol.policy.common.req_Sm = 1;     // all operations require SCP03
 
     sss_policy_t pol{};
     pol.policies[0] = &asymPol;
     pol.policies[1] = &commonPol;
-    pol.nPolicies   = 2;
+    pol.nPolicies = 2;
 
     LOG_DEBUG("generateKeyWithPolicy: id=0x%08X policy=%s\n", keyId,
               policy == KeyPolicy::SignOnly ? "sign-only" : "sign-decrypt");

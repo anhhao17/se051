@@ -70,39 +70,74 @@ cross GCC + sysroot; edit that path to match your install.
   `-Wl,--gc-sections` for `cpp_app`/`pkcs11_lib` (and section flags for mbedTLS so GC can drop
   unused archive code).
 
-**Tests:** there is no host-side automated test suite. Verification is manual on hardware (e.g.
-`rng 32` returns bytes; `openssl req -in <csr> -noout -text` validates a CSR).
+**Tests:** no host-side automated suite. On-hardware smoke test: `tools/test_se05x.sh` (set
+`EX_SSS_BOOT_SSS_PORT` and `EX_SSS_BOOT_SCP03_PATH`, then `sh tools/test_se05x.sh`). Manual
+verification: `rng 32` returns bytes; `openssl req -in <csr> -noout -text` validates a CSR.
 
 ## cpp_app architecture (the big picture)
 
 `se05x_crypto_app` is a single binary with **two interchangeable crypto backends** behind one
-abstract interface. Reading these files together explains the whole app:
+abstract interface, and a **Command pattern** for CLI dispatch. Reading these files together explains
+the whole app:
 
-- `crypto_backend.hpp` - `ICryptoBackend`: the strategy interface (genkey, sign, verify, encrypt,
-  decrypt, csr, rng, getSpki, keyExists, deleteKey). Two implementations:
-  - `SssBackend` - NXP SSS API + mbedTLS directly (digest computed host-side, then SE signs).
-  - `Pkcs11Backend` - `libsss_pkcs11.so` via `dlopen` (`CKM_SHA256_RSA_PKCS` hashes on the SE;
+### Backend (strategy pattern)
+
+- `crypto_backend.hpp` — `ICryptoBackend`: strategy interface (genkey, sign, verify, csr, rng,
+  getSpki, keyExists, deleteKey). Two implementations:
+  - `SssBackend` — NXP SSS API + mbedTLS directly (digest computed host-side, then SE signs).
+  - `Pkcs11Backend` — `libsss_pkcs11.so` via `dlopen` (`CKM_SHA256_RSA_PKCS` hashes on the SE;
     `CKM_RSA_PKCS_OAEP`). Both backends produce/consume identical on-wire formats.
-- `main.cpp` - selects the backend and owns session lifecycle. **Critical constraint:** the SE05x
-  allows only **one Platform SCP03 channel at a time**. Opening both an SSS session and PKCS#11
-  `C_Initialize` resets whichever opened first, causing `0x6982` APDU errors. `preParse()` +
-  `isPkcs11Command()` decide the backend *before* any session opens, so only one is ever opened.
-- `cli.cpp` - arg parsing + dispatch. Crypto commands delegate to `ICryptoBackend` with no
-  backend-specific branching. **SE-management commands (`se uid`, `rsa write-cert`,
-  `rsa verify-binding`) are SSS-only** - they use the direct `se05x::Session` (`mgmt_`) and throw if
-  invoked under `--pkcs11`, because a PKCS#11-only invocation opens no SSS session.
-- `se05x_crypto.{hpp,cpp}` - `RsaKey` + `Session` RAII wrappers over the SSS API (RSA only; no EC).
-- `se05x_provision.{hpp,cpp}` - SE-specific ops with no PKCS#11 equivalent: UID read, binary cert
-  storage, key↔cert binding check.
-- `pkcs11_ctx.{hpp,cpp}` - RAII PKCS#11 session.
-- `csr.cpp` - PKCS#10 CSR assembly (see below).
-- `log.hpp` - global logger (see "Logging").
+
+### Command dispatch
+
+- `command.hpp` — `Command` base class + `Args` struct + `SessionNeed` enum + `CommandContext`.
+  Each concrete command declares what session it needs; main() routes session setup accordingly.
+  `SessionNeed` values:
+  - `Crypto` — via `ICryptoBackend`; may use PKCS#11 (`--pkcs11`) or SSS.
+  - `Management` — SSS session with the SE05x applet selected (uid / cert / binding).
+  - `Isd` — SSS session with the applet **not** selected (PlatformSCP03 key rotation via ISD).
+- `commands.cpp/hpp` — all concrete `Command` subclasses + `CommandRegistry`. Adding a new command
+  is a new subclass + one `add(...)` call; no existing dispatch code changes.
+- `cli.cpp` — only `parseArgs()`: turns argv into an `Args`. No dispatch here.
+- `output.cpp/hpp` — `OutputWriter`: centralized result / file emission (`bytes`, `spki`, `text`,
+  `line`). Also owns `readFile`.
+
+### Session routing in `main.cpp`
+
+**Critical constraint:** the SE05x allows only **one Platform SCP03 channel at a time**. The
+session type is decided once before any SE interaction:
+
+```
+Crypto + --pkcs11 → Pkcs11Backend (no SSS session at all)
+Crypto (no pkcs11) → SSS session, applet selected, SssBackend
+Management        → SSS session, applet selected
+Isd               → SSS session, skip_select_applet = 1 (ISD only — no applet select)
+```
+
+### SE helpers
+
+- `se05x_crypto.{hpp,cpp}` — `RsaKey` + `Session` RAII wrappers over the SSS API (RSA only; no EC).
+- `se05x_provision.{hpp,cpp}` — SE-specific ops: UID read, cert/binary object storage
+  (`writeCert`, `writeBinary`, `readBinary`), key↔cert binding check, policy-aware keygen.
+- `scp03_rotate.{hpp,cpp}` — Platform SCP03 key rotation (GP PUT KEY over ISD session). Port of
+  NXP's `se05x_TP_PlatformSCP03keys` demo. Key-wrapping via `sss_host_cipher_one_go` (AES-CBC,
+  IV=0 = AES-ECB for a single block) matching the NXP reference.
+- `scp03_keyfile.{hpp,cpp}` — Read/write the `ENC/MAC/DEK` hex-line key file atomically (`.tmp` →
+  rename, `.bak` backup). Used by both `rotateScp03` (reads current DEK) and `RotateScp03Command`
+  (persists new keys).
+- `pkcs11_ctx.{hpp,cpp}` — RAII PKCS#11 session.
+- `csr.cpp` — PKCS#10 CSR assembly (see below).
+- `sw_decode.hpp` — `swMeaning(sw)`: human-readable string for SE APDU status words.
+- `keys.hpp` — key ID constants (`kRsaKeyId=0xFE000001`, `kRsaCerId=0xFE000002`,
+  `kDeviceInfoId=0xFE000010`).
+- `log.hpp` — global logger (see "Logging").
 
 ### Logging
 
-`Log` is a **global singleton** initialized once in `main()` via `Log::init(logPath)`; every TU
-reaches it through the `LOG_DEBUG/INFO/OK/ERROR` macros (which capture `__FILE__`/`__LINE__` and
-prepend a timestamp). Do **not** thread a `Log&` through constructors.
+`Log` is a **global singleton** initialized once in `main()` via `Log::init(logPath, level)`; every
+TU reaches it through the `LOG_DEBUG/INFO/OK/ERROR` macros (which capture `__FILE__`/`__LINE__` and
+prepend a timestamp). Do **not** thread a `Log&` through constructors. Pass `--debug` or `--verbose`
+on the CLI to raise to `Log::DEBUG` level.
 
 - Status lines (`[i]/[+]/[!]`, timestamped, with source location) always go to **stderr**; also to
   the log file when `--log` is active.
@@ -181,15 +216,23 @@ SE). `cpp_app` writes the CSR to stdout or `--out`; verify with
 ## Provisioning commands & status
 
 ```
-se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]
+se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] [--debug] <group> <cmd> [opts]
 
   rng <nbytes>
-  se  uid                                                  # 18-byte chip UID (SSS only)
-  rsa genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force]
-             [--policy full|sign-only|sign-decrypt]
-  rsa pub / sign / verify / encrypt / decrypt / csr
-  rsa write-cert     --id <id> --in <cert.der>             # SSS only; idempotent erase-then-write
-  rsa verify-binding --id <id> --cert <cert.der>           # SSS only; TRNG nonce→SE sign→mbedTLS verify
+  se  uid
+  se  write-info   (--data <text> | --data-hex <hex>) [--id <hex>=0xFE000010] [--force]
+  se  read-info    [--id <hex>=0xFE000010] [--out <f>]
+  se  verify-info  (--data <text> | --data-hex <hex>) [--id <hex>=0xFE000010]
+  se  rotate-scp03 --enc <hex32> --mac <hex32> --dek <hex32>
+                   (--dry-run | --confirm) [--key-out <f>]     # ISD session; IRREVERSIBLE
+  rsa genkey       [--id <hex>=0xFE000001] [--bits 2048|3072|4096]
+                   [--policy full|sign-only|sign-decrypt] [--force] [--out <f>]
+  rsa pub          [--id <hex>] [--out <f>] [--pem]
+  rsa sign         [--id <hex>] --in <f> [--out <f>]
+  rsa verify       [--id <hex>] --in <f> --sig <f>
+  rsa csr          [--id <hex>] --subject "CN=..." [--out <f>]
+  rsa write-cert   [--id <hex>] --in <cert.der>                # SSS only; idempotent erase-then-write
+  rsa verify-binding [--id <hex>] --cert <cert.der>            # SSS only; TRNG nonce→SE sign→mbedTLS verify
 ```
 
 - **Idempotent genkey**: checks `se05x::objectExists()` first; with an existing key and no
@@ -200,13 +243,19 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
   Policy is ignored by the PKCS#11 backend. Implementation: `se05x::generateKeyWithPolicy()`
   in `se05x_provision.cpp`; uses `sss_policy_asym_key_u` (sign/decrypt/gen) + `sss_policy_common_u`
   (req_Sm=1, can_Delete=0, can_Write=0, can_Read=1) passed as `options` to `sss_key_store_generate_key`.
-- **Key IDs**: CLI default `0xFE000001` (test range). Production provisioning uses `0xFE000001`
-  (key) / `0xFE000001` (cert).
+- **Key IDs**: `kRsaKeyId=0xFE000001`, `kRsaCerId=0xFE000002`, `kDeviceInfoId=0xFE000010` (in `keys.hpp`).
 - **Connect string** via `--port` or `$EX_SSS_BOOT_SSS_PORT` (e.g. `/dev/i2c-1:0x48`).
-- **Not yet implemented**: `rotate-scp03` (per-device SCP03 key KDF from UID - irreversible; treat
-  carefully).
-- **Plan/status**: `docs/provisioning.md`, `docs/provisioning_plan.md`. M1 (build), M2 (PKCS#11),
-  M4 (provisioning cmds), M3 policy done; `rotate-scp03` and M5–M6 not started.
+- **rotate-scp03**: implemented. Opens an ISD session (`skip_select_applet=1`) so PUT KEY reaches
+  the card manager, not the SE05x applet. Requires `--confirm` to actually execute; `--dry-run`
+  builds and logs the APDU without sending. On success, persists the new keys to `$EX_SSS_BOOT_SCP03_PATH`
+  (or `--key-out`) with atomic rename and `.bak` backup. The current DEK is read from the key file
+  to wrap the new keys (NXP demo pattern: `pStatic_ctx->Dek` is not populated by `ex_sss_boot_open`).
+- **Smoke test**: `tools/test_se05x.sh` — set `APP=`, `EX_SSS_BOOT_SSS_PORT`, `EX_SSS_BOOT_SCP03_PATH`
+  and run on hardware. Covers rng, uid, genkey (force/idempotent), pub (DER/PEM), sign, verify
+  (good/tampered), csr, write-cert, verify-binding, write/read/verify-info round-trip, rotate-scp03
+  `--dry-run`.
+- **Plan/status**: `docs/provisioning.md`, `docs/provisioning_plan.md`. M1–M4 + rotate-scp03 done;
+  M5–M6 (CA integration, orchestration) not started.
 
 ## Key ID safe range
 

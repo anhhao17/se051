@@ -23,20 +23,20 @@ namespace {
 
 using SignFn = std::function<std::vector<uint8_t>(const std::vector<uint8_t> &)>;
 
-#define CHK(expr)                                                                        \
-    do {                                                                                 \
-        int _r = (expr);                                                                 \
-        if (_r < 0) throw CryptoError("mbedtls ASN.1 write failed");                     \
-        len += _r;                                                                       \
+#define CHK(expr)                                                                                  \
+    do {                                                                                           \
+        int _r = (expr);                                                                           \
+        if (_r < 0)                                                                                \
+            throw CryptoError("mbedtls ASN.1 write failed");                                       \
+        len += _r;                                                                                 \
     } while (0)
 
 // Build CertificationRequestInfo (the TBS). Writes backwards into buf.
-std::vector<uint8_t> buildCri(const std::string          &subjectDn,
-                              const std::vector<uint8_t> &spki) {
+std::vector<uint8_t> buildCri(const std::string &subjectDn, const std::vector<uint8_t> &spki) {
     std::vector<uint8_t> buf(4096);
-    unsigned char       *start = buf.data();
-    unsigned char       *c     = buf.data() + buf.size();
-    int                  len   = 0;
+    unsigned char *start = buf.data();
+    unsigned char *c = buf.data() + buf.size();
+    int len = 0;
 
     mbedtls_asn1_named_data *names = nullptr;
     if (mbedtls_x509_string_to_names(&names, subjectDn.c_str()) != 0)
@@ -44,8 +44,8 @@ std::vector<uint8_t> buildCri(const std::string          &subjectDn,
 
     // attributes [0] -- empty SET
     CHK(mbedtls_asn1_write_len(&c, start, 0));
-    CHK(mbedtls_asn1_write_tag(
-        &c, start, MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED | 0));
+    CHK(mbedtls_asn1_write_tag(&c, start,
+                               MBEDTLS_ASN1_CONTEXT_SPECIFIC | MBEDTLS_ASN1_CONSTRUCTED | 0));
 
     // subjectPKInfo -- raw SubjectPublicKeyInfo from the SE
     if (static_cast<size_t>(c - start) < spki.size()) {
@@ -60,7 +60,8 @@ std::vector<uint8_t> buildCri(const std::string          &subjectDn,
     {
         int r = mbedtls_x509_write_names(&c, start, names);
         mbedtls_asn1_free_named_data_list(&names);
-        if (r < 0) throw CryptoError("x509_write_names failed");
+        if (r < 0)
+            throw CryptoError("x509_write_names failed");
         len += r;
     }
 
@@ -69,19 +70,19 @@ std::vector<uint8_t> buildCri(const std::string          &subjectDn,
 
     // wrap in SEQUENCE
     CHK(mbedtls_asn1_write_len(&c, start, len));
-    CHK(mbedtls_asn1_write_tag(&c, start,
-                               MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+    CHK(mbedtls_asn1_write_tag(&c, start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
 
     return std::vector<uint8_t>(c, c + len);
 }
 
 std::string toPem(const std::vector<uint8_t> &der) {
     std::vector<unsigned char> pem(der.size() * 2 + 256);
-    size_t                     olen = 0;
+    size_t olen = 0;
     int r = mbedtls_pem_write_buffer("-----BEGIN CERTIFICATE REQUEST-----\n",
-                                     "-----END CERTIFICATE REQUEST-----\n", der.data(),
-                                     der.size(), pem.data(), pem.size(), &olen);
-    if (r != 0) throw CryptoError("pem_write_buffer failed");
+                                     "-----END CERTIFICATE REQUEST-----\n", der.data(), der.size(),
+                                     pem.data(), pem.size(), &olen);
+    if (r != 0)
+        throw CryptoError("pem_write_buffer failed");
     return std::string(reinterpret_cast<char *>(pem.data()), olen);
 }
 
@@ -89,35 +90,35 @@ std::string toPem(const std::vector<uint8_t> &der) {
 
 std::string spkiToPem(const std::vector<uint8_t> &spkiDer) {
     std::vector<unsigned char> pem(spkiDer.size() * 2 + 256);
-    size_t                     olen = 0;
-    int r = mbedtls_pem_write_buffer("-----BEGIN PUBLIC KEY-----\n",
-                                     "-----END PUBLIC KEY-----\n", spkiDer.data(),
-                                     spkiDer.size(), pem.data(), pem.size(), &olen);
-    if (r != 0) throw CryptoError("pem_write_buffer(public key) failed");
+    size_t olen = 0;
+    int r = mbedtls_pem_write_buffer("-----BEGIN PUBLIC KEY-----\n", "-----END PUBLIC KEY-----\n",
+                                     spkiDer.data(), spkiDer.size(), pem.data(), pem.size(), &olen);
+    if (r != 0)
+        throw CryptoError("pem_write_buffer(public key) failed");
     return std::string(reinterpret_cast<char *>(pem.data()), olen);
 }
 
 namespace {
 
 // Assemble the final CertificationRequest and PEM-encode it.
-std::string assembleCsr(const std::vector<uint8_t> &cri,
-                        const std::vector<uint8_t> &signature) {
+std::string assembleCsr(const std::vector<uint8_t> &cri, const std::vector<uint8_t> &signature) {
     std::vector<uint8_t> buf(8192);
-    unsigned char       *start = buf.data();
-    unsigned char       *c     = buf.data() + buf.size();
-    int                  len   = 0;
+    unsigned char *start = buf.data();
+    unsigned char *c = buf.data() + buf.size();
+    int len = 0;
 
     // signature BIT STRING (0 unused bits)
-    CHK(mbedtls_asn1_write_bitstring(
-        &c, start, reinterpret_cast<const unsigned char *>(signature.data()),
-        signature.size() * 8));
+    CHK(mbedtls_asn1_write_bitstring(&c, start,
+                                     reinterpret_cast<const unsigned char *>(signature.data()),
+                                     signature.size() * 8));
 
     // signatureAlgorithm: sha256WithRSAEncryption with explicit NULL params
     {
-        const char *oid    = MBEDTLS_OID_PKCS1_SHA256;
-        size_t      oidLen = MBEDTLS_OID_SIZE(MBEDTLS_OID_PKCS1_SHA256);
+        const char *oid = MBEDTLS_OID_PKCS1_SHA256;
+        size_t oidLen = MBEDTLS_OID_SIZE(MBEDTLS_OID_PKCS1_SHA256);
         int r = mbedtls_asn1_write_algorithm_identifier(&c, start, oid, oidLen, 0);
-        if (r < 0) throw CryptoError("write_algorithm_identifier failed");
+        if (r < 0)
+            throw CryptoError("write_algorithm_identifier failed");
         len += r;
     }
 
@@ -130,8 +131,7 @@ std::string assembleCsr(const std::vector<uint8_t> &cri,
 
     // wrap SEQUENCE
     CHK(mbedtls_asn1_write_len(&c, start, len));
-    CHK(mbedtls_asn1_write_tag(&c, start,
-                               MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
+    CHK(mbedtls_asn1_write_tag(&c, start, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE));
 
     return toPem(std::vector<uint8_t>(c, c + len));
 }

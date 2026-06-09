@@ -4,7 +4,7 @@
  */
 
 #include "output.hpp"
-#include "command.hpp"   // Args
+#include "command.hpp" // Args
 #include "log.hpp"
 #include "se05x_crypto.hpp" // se05x::spkiToPem
 
@@ -16,13 +16,15 @@
 
 std::vector<uint8_t> OutputWriter::readFile(const std::string &path) {
     std::ifstream f(path, std::ios::binary);
-    if (!f) throw std::runtime_error("cannot open: " + path);
+    if (!f)
+        throw std::runtime_error("cannot open: " + path);
     return {std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
 }
 
 void OutputWriter::writeFile(const std::string &path, const std::vector<uint8_t> &d) {
     std::ofstream f(path, std::ios::binary);
-    if (!f) throw std::runtime_error("cannot write: " + path);
+    if (!f)
+        throw std::runtime_error("cannot write: " + path);
     f.write(reinterpret_cast<const char *>(d.data()), static_cast<std::streamsize>(d.size()));
 }
 
@@ -54,7 +56,7 @@ void OutputWriter::text(const Args &a, const std::string &t) const {
 }
 
 void OutputWriter::line(const char *fmt, ...) const {
-    char    buf[512];
+    char buf[512];
     va_list ap;
     va_start(ap, fmt);
     std::vsnprintf(buf, sizeof(buf), fmt, ap);

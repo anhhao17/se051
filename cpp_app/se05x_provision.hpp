@@ -92,7 +92,6 @@ bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool
  */
 std::vector<uint8_t> readBinary(Session &s, uint32_t id);
 
-
 /**
  * @brief Verify that the RSA private key at @p keyId corresponds to the
  *        public key embedded in @p certDer.

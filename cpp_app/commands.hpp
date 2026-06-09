@@ -34,6 +34,6 @@ public:
 private:
     void add(std::unique_ptr<Command> c);
 
-    std::vector<std::unique_ptr<Command>>                       cmds_;
+    std::vector<std::unique_ptr<Command>> cmds_;
     std::map<std::pair<std::string, std::string>, const Command *> index_;
 };

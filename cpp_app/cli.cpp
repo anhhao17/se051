@@ -17,7 +17,7 @@ bool isBoolFlag(const std::string &t) {
 } // namespace
 
 Args parseArgs(int argc, char **argv) {
-    Args                     a;
+    Args a;
     std::vector<std::string> pos;
     for (int i = 1; i < argc; ++i) {
         std::string t = argv[i];
@@ -33,9 +33,13 @@ Args parseArgs(int argc, char **argv) {
             pos.push_back(t);
         }
     }
-    if (pos.size() > 0) a.group = pos[0];
-    if (pos.size() > 1) a.command = pos[1];
-    if (pos.size() > 2) a.positional = pos[2];
-    if (a.group == "rng" && a.positional.empty()) a.positional = a.command;
+    if (pos.size() > 0)
+        a.group = pos[0];
+    if (pos.size() > 1)
+        a.command = pos[1];
+    if (pos.size() > 2)
+        a.positional = pos[2];
+    if (a.group == "rng" && a.positional.empty())
+        a.positional = a.command;
     return a;
 }

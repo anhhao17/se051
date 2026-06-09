@@ -18,9 +18,9 @@
 
 /** @brief Parsed command line: positional tokens + --opt value/flag map. */
 struct Args {
-    std::string                        group;      ///< 1st positional (rng/se/rsa)
-    std::string                        command;    ///< 2nd positional (uid/genkey/...)
-    std::string                        positional; ///< 3rd positional (rng <nbytes>)
+    std::string group;      ///< 1st positional (rng/se/rsa)
+    std::string command;    ///< 2nd positional (uid/genkey/...)
+    std::string positional; ///< 3rd positional (rng <nbytes>)
     std::map<std::string, std::string> opt;
 
     bool flag(const std::string &k) const { return opt.count(k) != 0; }
@@ -41,9 +41,9 @@ class OutputWriter; // result/file emission (output.hpp)
 
 /** @brief Everything a command needs to run; assembled by main() after session setup. */
 struct CommandContext {
-    ICryptoBackend &crypto;       ///< crypto operations (PKCS#11 or SSS)
-    se05x::Session *mgmt;         ///< non-null for Management / Isd commands
-    OutputWriter   &out;          ///< result and file output
+    ICryptoBackend &crypto; ///< crypto operations (PKCS#11 or SSS)
+    se05x::Session *mgmt;   ///< non-null for Management / Isd commands
+    OutputWriter &out;      ///< result and file output
 
     /** @return the management session, or throw if this invocation has none. */
     se05x::Session &requireMgmt() const;
@@ -54,9 +54,9 @@ class Command {
 public:
     virtual ~Command() = default;
 
-    virtual const char *group() const = 0;       ///< "rng" / "se" / "rsa"
-    virtual const char *name() const  = 0;       ///< "uid" / "genkey" / ... ("" = group default)
-    virtual const char *help() const  = 0;       ///< one-line usage string
+    virtual const char *group() const = 0; ///< "rng" / "se" / "rsa"
+    virtual const char *name() const = 0;  ///< "uid" / "genkey" / ... ("" = group default)
+    virtual const char *help() const = 0;  ///< one-line usage string
     virtual SessionNeed sessionNeed() const = 0;
 
     /** @brief Extra names this command also answers to (e.g. genkey -> provision). */

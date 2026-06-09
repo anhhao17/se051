@@ -34,8 +34,10 @@ extern "C" {
 #ifndef GP_INS_PUTKEY
 #define GP_INS_PUTKEY 0xD8 // GP PUT KEY
 #endif
-#ifndef GP_P2_MULTIPLEKEYS
-#define GP_P2_MULTIPLEKEYS 0x81 // b8=multiple keys, key id 1
+#ifndef GP_P2_NEW_MULTI
+// P2 for PUT KEY with multiple keys: b8=1 (multiple present), b7-b1 = new KVN.
+// Computed at runtime from keyVer; do not define a single constant.
+#define GP_P2_NEW_MULTI(kvn) ((uint8_t)((kvn) | 0x80u))
 #endif
 #ifndef PUT_KEYS_KEY_TYPE_CODING_AES
 #define PUT_KEYS_KEY_TYPE_CODING_AES 0x88 // AES key type
@@ -73,34 +75,38 @@ void loadCurrentDek(Session &s) {
 
     NXSCP03_StaticCtx_t *st = staticCtx(s);
     st->key_len = kScpKeyLen;
-    check(sss_host_key_store_set_key(st->Dek.keyStore, &st->Dek, dek, kScpKeyLen,
-                                     kScpKeyLen * 8, nullptr, 0),
+    check(sss_host_key_store_set_key(st->Dek.keyStore, &st->Dek, dek, kScpKeyLen, kScpKeyLen * 8,
+                                     nullptr, 0),
           "rotateScp03: load current DEK into static ctx");
 }
 
 // Port of genKCVandEncryptKey(): KCV = AES-CBC(plainKey, IV=0, {0x01}*16)[0:3];
 // encrypted = AES-CBC(currentDEK, IV=0, plainKey).  Uses the host crypto path,
 // exactly as the demo, so the math is identical to NXP's reference.
-void genKcvAndEncryptKey(Session &s, const uint8_t *plainKey,
-                         uint8_t encOut[kScpKeyLen], uint8_t kcvOut[CRYPTO_KEY_CHECK_LEN]) {
+void genKcvAndEncryptKey(Session &s, const uint8_t *plainKey, uint8_t encOut[kScpKeyLen],
+                         uint8_t kcvOut[CRYPTO_KEY_CHECK_LEN]) {
     ex_sss_boot_ctx_t *pCtx = s.bootCtx();
     NXSCP03_StaticCtx_t *st = staticCtx(s);
 
-    sss_object_t    keyObj{};
+    sss_object_t keyObj{};
     sss_symmetric_t symm{};
-    const uint32_t  kHostKeyId = 0x544D5031; // "TMP1" – transient host scratch id
+    const uint32_t kHostKeyId = 0x544D5031; // "TMP1" – transient host scratch id
 
     auto cleanup = [&] {
-        if (symm.keyObject) sss_host_symmetric_context_free(&symm);
+        if (symm.keyObject)
+            sss_host_symmetric_context_free(&symm);
         sss_host_key_object_free(&keyObj);
     };
 
     check(sss_host_key_object_init(&keyObj, &pCtx->host_ks),
           "genKcvAndEncryptKey: key_object_init");
-    sss_status_t rc = sss_host_key_object_allocate_handle(
-        &keyObj, kHostKeyId, kSSS_KeyPart_Default, kSSS_CipherType_AES,
-        kScpKeyLen, kKeyObject_Mode_Transient);
-    if (rc != kStatus_SSS_Success) { sss_host_key_object_free(&keyObj); check(rc, "allocate_handle"); }
+    sss_status_t rc = sss_host_key_object_allocate_handle(&keyObj, kHostKeyId, kSSS_KeyPart_Default,
+                                                          kSSS_CipherType_AES, kScpKeyLen,
+                                                          kKeyObject_Mode_Transient);
+    if (rc != kStatus_SSS_Success) {
+        sss_host_key_object_free(&keyObj);
+        check(rc, "allocate_handle");
+    }
 
     uint8_t iv[16] = {};
 
@@ -108,33 +114,55 @@ void genKcvAndEncryptKey(Session &s, const uint8_t *plainKey,
     uint8_t refOnes[kScpKeyLen];
     std::memset(refOnes, 1, sizeof(refOnes));
     uint8_t kcvFull[kScpKeyLen] = {};
-    rc = sss_host_key_store_set_key(&pCtx->host_ks, &keyObj, plainKey, kScpKeyLen,
-                                    kScpKeyLen * 8, nullptr, 0);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "set new key (KCV)"); }
+    rc = sss_host_key_store_set_key(&pCtx->host_ks, &keyObj, plainKey, kScpKeyLen, kScpKeyLen * 8,
+                                    nullptr, 0);
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "set new key (KCV)");
+    }
     rc = sss_host_symmetric_context_init(&symm, &pCtx->host_session, &keyObj,
                                          kAlgorithm_SSS_AES_CBC, kMode_SSS_Encrypt);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "symm_init (KCV)"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "symm_init (KCV)");
+    }
     rc = sss_host_cipher_one_go(&symm, iv, sizeof(iv), refOnes, kcvFull, kScpKeyLen);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "cipher (KCV)"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "cipher (KCV)");
+    }
     std::memcpy(kcvOut, kcvFull, CRYPTO_KEY_CHECK_LEN);
 
     // 2) wrap the new key with the current DEK
     uint8_t dek[kScpKeyLen] = {};
-    size_t  dekLen = sizeof(dek), dekBits = sizeof(dek) * 8;
+    size_t dekLen = sizeof(dek), dekBits = sizeof(dek) * 8;
     rc = sss_host_key_store_get_key(&pCtx->host_ks, &st->Dek, dek, &dekLen, &dekBits);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "get current DEK"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "get current DEK");
+    }
     rc = sss_host_key_store_set_key(&pCtx->host_ks, &keyObj, dek, st->key_len,
                                     static_cast<size_t>(st->key_len) * 8, nullptr, 0);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "set DEK"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "set DEK");
+    }
     rc = sss_host_symmetric_context_init(&symm, &pCtx->host_session, &keyObj,
                                          kAlgorithm_SSS_AES_CBC, kMode_SSS_Encrypt);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "symm_init (wrap)"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "symm_init (wrap)");
+    }
     rc = sss_host_cipher_one_go(&symm, iv, sizeof(iv), plainKey, encOut, kScpKeyLen);
-    if (rc != kStatus_SSS_Success) { cleanup(); check(rc, "cipher (wrap)"); }
+    if (rc != kStatus_SSS_Success) {
+        cleanup();
+        check(rc, "cipher (wrap)");
+    }
 
     // scrub the DEK copy off the stack
     volatile uint8_t *vp = dek;
-    for (size_t i = 0; i < sizeof(dek); ++i) vp[i] = 0;
+    for (size_t i = 0; i < sizeof(dek); ++i)
+        vp[i] = 0;
     cleanup();
 }
 
@@ -157,8 +185,8 @@ size_t createKeyData(Session &s, const uint8_t *key, uint8_t *dst,
 // Platform SCP03 key rotation (port of NXP tp_PlatformKeys)
 
 void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
-    NXSCP03_StaticCtx_t *st     = staticCtx(s);
-    const uint8_t        keyVer = st->keyVerNo; // KVN to replace (e.g. 0x0B on 07.02)
+    NXSCP03_StaticCtx_t *st = staticCtx(s);
+    const uint8_t keyVer = st->keyVerNo; // KVN to replace (e.g. 0x0B on 07.02)
 
     // PUT KEY requires the SCP03 channel at full security (C-MAC + C-DECRYPTION
     // = 0x33); the wrapped key data must be command-encrypted.  Reads succeed at
@@ -170,7 +198,11 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
     if (secLevel != 0x33)
         throw std::runtime_error(
             "rotateScp03: SCP03 security level is 0x" +
-            [secLevel] { char b[4]; std::snprintf(b, sizeof(b), "%02X", secLevel); return std::string(b); }() +
+            [secLevel] {
+                char b[4];
+                std::snprintf(b, sizeof(b), "%02X", secLevel);
+                return std::string(b);
+            }() +
             ", but PUT KEY needs 0x33 (C-MAC + C-DECRYPTION); open the session at full "
             "security before rotating");
 
@@ -181,18 +213,18 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
 
     // Build the GP PUT KEY body:  new_kvn | ENC block | MAC block | DEK block
     uint8_t cmdBuf[128] = {};
-    size_t  len         = 0;
+    size_t len = 0;
     cmdBuf[len++] = keyVer; // new key version (unchanged)
 
     // Expected response echo = new_kvn | KCV(enc) | KCV(mac) | KCV(dek)
     uint8_t expected[1 + 3 * CRYPTO_KEY_CHECK_LEN] = {};
-    size_t  expLen = 0;
+    size_t expLen = 0;
     expected[expLen++] = keyVer;
 
     const uint8_t *keys[3] = {newKeys.enc, newKeys.mac, newKeys.dek};
     for (const uint8_t *k : keys) {
         uint8_t kcv[CRYPTO_KEY_CHECK_LEN];
-        len    += createKeyData(s, k, &cmdBuf[len], kcv);
+        len += createKeyData(s, k, &cmdBuf[len], kcv);
         std::memcpy(&expected[expLen], kcv, CRYPTO_KEY_CHECK_LEN);
         expLen += CRYPTO_KEY_CHECK_LEN;
     }
@@ -204,13 +236,12 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
 
     // Send over the active SCP03 session (S-ENC + C-MAC applied by the transport).
     auto *se05xSession = reinterpret_cast<sss_se05x_session_t *>(s.session());
-    const tlvHeader_t hdr = {{GP_CLA_BYTE, GP_INS_PUTKEY, keyVer, GP_P2_MULTIPLEKEYS}};
-    uint8_t  rsp[64] = {};
-    size_t   rspLen  = sizeof(rsp);
+    const tlvHeader_t hdr = {{GP_CLA_BYTE, GP_INS_PUTKEY, keyVer, GP_P2_NEW_MULTI(keyVer)}};
+    uint8_t rsp[64] = {};
+    size_t rspLen = sizeof(rsp);
 
     LOG_DEBUG("rotateScp03: sending PUT KEY (%zu bytes) over SCP03\n", len);
-    smStatus_t txr = DoAPDUTxRx_s_Case4(&se05xSession->s_ctx, &hdr,
-                                        cmdBuf, len, rsp, &rspLen);
+    smStatus_t txr = DoAPDUTxRx_s_Case4(&se05xSession->s_ctx, &hdr, cmdBuf, len, rsp, &rspLen);
 
     char swbuf[8];
     if (txr != SM_OK) {
@@ -237,7 +268,8 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
             "rotated keys; rotation NOT confirmed");
 
     LOG_OK("PlatformSCP03 keys rotated and KCV-verified at version 0x%02X; "
-           "persist the new keys and reopen to authenticate with them\n", keyVer);
+           "persist the new keys and reopen to authenticate with them\n",
+           keyVer);
 }
 
 } // namespace se05x

@@ -20,7 +20,8 @@ namespace {
 bool parse16(const char *p, uint8_t out[16]) {
     for (int i = 0; i < 16; ++i) {
         unsigned b = 0;
-        if (std::sscanf(p + i * 2, "%02x", &b) != 1) return false;
+        if (std::sscanf(p + i * 2, "%02x", &b) != 1)
+            return false;
         out[i] = static_cast<uint8_t>(b);
     }
     return true;
@@ -30,17 +31,21 @@ bool parse16(const char *p, uint8_t out[16]) {
 // Returns false if the tag line is absent or malformed.
 bool findKey(const std::string &path, const char *tag, uint8_t out[16]) {
     FILE *fp = std::fopen(path.c_str(), "r");
-    if (!fp) return false;
+    if (!fp)
+        return false;
 
     char line[512];
     bool found = false;
     const size_t tagLen = std::strlen(tag);
     while (std::fgets(line, sizeof(line), fp)) {
         const char *p = line;
-        while (*p == ' ' || *p == '\t') ++p;
-        if (std::strncmp(p, tag, tagLen) != 0 || p[tagLen] != ' ') continue;
+        while (*p == ' ' || *p == '\t')
+            ++p;
+        if (std::strncmp(p, tag, tagLen) != 0 || p[tagLen] != ' ')
+            continue;
         p += tagLen + 1;
-        while (*p == ' ' || *p == '\t') ++p;
+        while (*p == ' ' || *p == '\t')
+            ++p;
         found = parse16(p, out);
         break;
     }
@@ -56,8 +61,7 @@ bool readDek(const std::string &path, uint8_t dek[16]) {
 
 Scp03KeySet read(const std::string &path) {
     Scp03KeySet ks{};
-    if (!findKey(path, "ENC", ks.enc) ||
-        !findKey(path, "MAC", ks.mac) ||
+    if (!findKey(path, "ENC", ks.enc) || !findKey(path, "MAC", ks.mac) ||
         !findKey(path, "DEK", ks.dek))
         throw std::runtime_error(
             "Scp03KeyFile::read: '" + path +
@@ -72,8 +76,8 @@ void write(const std::string &path, const Scp03KeySet &keys) {
         const std::string bak = path + ".bak";
         std::remove(bak.c_str());
         if (std::rename(path.c_str(), bak.c_str()) != 0)
-            throw std::runtime_error("Scp03KeyFile::write: cannot back up '" + path +
-                                     "' to '" + bak + "'");
+            throw std::runtime_error("Scp03KeyFile::write: cannot back up '" + path + "' to '" +
+                                     bak + "'");
     }
 
     // 2) Write to a temp file, then atomically rename into place.
@@ -84,7 +88,8 @@ void write(const std::string &path, const Scp03KeySet &keys) {
 
     auto emit = [&](const char *tag, const uint8_t k[16]) {
         std::fprintf(fp, "%s ", tag);
-        for (int i = 0; i < 16; ++i) std::fprintf(fp, "%02x", k[i]);
+        for (int i = 0; i < 16; ++i)
+            std::fprintf(fp, "%02x", k[i]);
         std::fputc('\n', fp);
     };
     emit("ENC", keys.enc);
@@ -97,8 +102,8 @@ void write(const std::string &path, const Scp03KeySet &keys) {
     }
     if (std::rename(tmp.c_str(), path.c_str()) != 0) {
         std::remove(tmp.c_str());
-        throw std::runtime_error("Scp03KeyFile::write: cannot rename '" + tmp +
-                                 "' to '" + path + "'");
+        throw std::runtime_error("Scp03KeyFile::write: cannot rename '" + tmp + "' to '" + path +
+                                 "'");
     }
 }
 

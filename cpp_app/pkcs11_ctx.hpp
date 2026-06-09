@@ -85,7 +85,7 @@ public:
      */
     ~Pkcs11Ctx();
 
-    Pkcs11Ctx(const Pkcs11Ctx &)            = delete;
+    Pkcs11Ctx(const Pkcs11Ctx &) = delete;
     Pkcs11Ctx &operator=(const Pkcs11Ctx &) = delete;
 
     /**
@@ -99,8 +99,7 @@ public:
      * @return      Pair of {public-key handle, private-key handle}.
      * @throws Pkcs11Error on SE or PKCS#11 failure.
      */
-    std::pair<CK_OBJECT_HANDLE, CK_OBJECT_HANDLE> genRsaKeyPair(uint32_t id,
-                                                                CK_ULONG bits);
+    std::pair<CK_OBJECT_HANDLE, CK_OBJECT_HANDLE> genRsaKeyPair(uint32_t id, CK_ULONG bits);
 
     /**
      * @brief Find a key object by SE object ID and PKCS#11 key class.
@@ -166,8 +165,7 @@ public:
      * @return       Ciphertext.
      * @throws Pkcs11Error on failure or oversized input.
      */
-    std::vector<uint8_t> encryptRsa(CK_OBJECT_HANDLE            hPub,
-                                    const std::vector<uint8_t> &plain);
+    std::vector<uint8_t> encryptRsa(CK_OBJECT_HANDLE hPub, const std::vector<uint8_t> &plain);
 
     /**
      * @brief Decrypt with RSA-OAEP-SHA256 (CKM_RSA_PKCS_OAEP).
@@ -177,8 +175,7 @@ public:
      * @return       Plaintext.
      * @throws Pkcs11Error on failure.
      */
-    std::vector<uint8_t> decryptRsa(CK_OBJECT_HANDLE            hPriv,
-                                    const std::vector<uint8_t> &cipher);
+    std::vector<uint8_t> decryptRsa(CK_OBJECT_HANDLE hPriv, const std::vector<uint8_t> &cipher);
 
     /**
      * @brief Generate random bytes via the SE hardware TRNG.
@@ -189,10 +186,10 @@ public:
     std::vector<uint8_t> getRandom(size_t n);
 
 private:
-    static std::string            label(uint32_t id);
+    static std::string label(uint32_t id);
     static std::array<CK_BYTE, 4> idBytes(uint32_t id);
 
-    void                *lib_   = nullptr;
-    CK_FUNCTION_LIST_PTR p11_   = nullptr;
-    CK_SESSION_HANDLE    hSess_ = CK_INVALID_HANDLE;
+    void *lib_ = nullptr;
+    CK_FUNCTION_LIST_PTR p11_ = nullptr;
+    CK_SESSION_HANDLE hSess_ = CK_INVALID_HANDLE;
 };

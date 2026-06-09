@@ -74,8 +74,6 @@ public:
     virtual bool verify(uint32_t id, const std::vector<uint8_t> &msg,
                         const std::vector<uint8_t> &sig) = 0;
 
-
-
     /**
      * @brief Build a PEM PKCS#10 CSR for the key at @p id.
      * @param subjectDn  Subject DN in OpenSSL format, e.g. "CN=foo,O=bar".
@@ -95,15 +93,15 @@ public:
     explicit Pkcs11Backend(const std::string &libPath);
 
     std::vector<uint8_t> getRandom(size_t n) override;
-    bool                 keyExists(uint32_t id) override;
-    void                 deleteKey(uint32_t id) override;
+    bool keyExists(uint32_t id) override;
+    void deleteKey(uint32_t id) override;
     void generateKey(uint32_t id, se05x::RsaBits bits,
                      se05x::KeyPolicy policy = se05x::KeyPolicy::Full) override;
     std::vector<uint8_t> getSpki(uint32_t id) override;
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
-    bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
-                                const std::vector<uint8_t> &sig) override;
-    std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
+    bool verify(uint32_t id, const std::vector<uint8_t> &msg,
+                const std::vector<uint8_t> &sig) override;
+    std::string makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
     Pkcs11Ctx ctx_;
@@ -119,15 +117,15 @@ public:
     explicit SssBackend(se05x::Session &session);
 
     std::vector<uint8_t> getRandom(size_t n) override;
-    bool                 keyExists(uint32_t id) override;
-    void                 deleteKey(uint32_t id) override;
+    bool keyExists(uint32_t id) override;
+    void deleteKey(uint32_t id) override;
     void generateKey(uint32_t id, se05x::RsaBits bits,
                      se05x::KeyPolicy policy = se05x::KeyPolicy::Full) override;
     std::vector<uint8_t> getSpki(uint32_t id) override;
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
-    bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
-                                const std::vector<uint8_t> &sig) override;
-    std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
+    bool verify(uint32_t id, const std::vector<uint8_t> &msg,
+                const std::vector<uint8_t> &sig) override;
+    std::string makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
     se05x::Session &session_;

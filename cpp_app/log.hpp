@@ -48,7 +48,8 @@ public:
      * was never called (e.g. in unit tests).
      */
     static Log &get() {
-        if (s_instance_) return *s_instance_;
+        if (s_instance_)
+            return *s_instance_;
         static Log fallback;
         return fallback;
     }
@@ -59,13 +60,16 @@ public:
      * the log file.  Use the LOG_* macros instead of calling directly.
      */
     void logAt(Level lvl, const char *file, int line, const char *fmt, ...) {
-        if (lvl < min_) return;
+        if (lvl < min_)
+            return;
         va_list a, b;
         va_start(a, fmt);
         va_copy(b, a);
         writeLine(stderr, lvl, file, line, fmt, a);
         va_end(a);
-        if (own_) { writeLine(f_, lvl, file, line, fmt, b); }
+        if (own_) {
+            writeLine(f_, lvl, file, line, fmt, b);
+        }
         va_end(b);
     }
 
@@ -93,9 +97,10 @@ private:
             throw std::runtime_error(std::string("cannot open log file: ") + path);
     }
     ~Log() {
-        if (own_ && f_) std::fclose(f_);
+        if (own_ && f_)
+            std::fclose(f_);
     }
-    Log(const Log &)            = delete;
+    Log(const Log &) = delete;
     Log &operator=(const Log &) = delete;
 
     static const char *tag(Level l) {
@@ -119,9 +124,8 @@ private:
         return s ? s + 1 : path;
     }
 
-    void writeLine(FILE *dst, Level lvl, const char *file, int line, const char *fmt,
-                   va_list ap) {
-        char        ts[20];
+    void writeLine(FILE *dst, Level lvl, const char *file, int line, const char *fmt, va_list ap) {
+        char ts[20];
         std::time_t t = std::time(nullptr);
         std::strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
         std::fprintf(dst, "%s %s %s:%d: ", ts, tag(lvl), shortname(file), line);
@@ -130,7 +134,7 @@ private:
     }
 
     FILE *f_;
-    bool  own_;
+    bool own_;
     Level min_;
 
     inline static Log *s_instance_ = nullptr;

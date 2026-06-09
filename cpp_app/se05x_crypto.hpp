@@ -48,7 +48,7 @@ public:
 
 private:
     static std::string hex(sss_status_t st);
-    sss_status_t       status_;
+    sss_status_t status_;
 };
 
 /** @brief RSA key size in bits. */
@@ -163,8 +163,7 @@ public:
      * @param signature Signature bytes.
      * @return          true if the signature is valid.
      */
-    bool verify(const std::vector<uint8_t> &digest,
-                const std::vector<uint8_t> &signature);
+    bool verify(const std::vector<uint8_t> &digest, const std::vector<uint8_t> &signature);
 
     /**
      * @brief Encrypt with RSAES-OAEP-SHA256.
@@ -199,16 +198,16 @@ public:
 
     ~RsaKey();
     RsaKey(RsaKey &&) noexcept;
-    RsaKey &operator=(RsaKey &&)      = delete;
-    RsaKey(const RsaKey &)            = delete;
+    RsaKey &operator=(RsaKey &&) = delete;
+    RsaKey(const RsaKey &) = delete;
     RsaKey &operator=(const RsaKey &) = delete;
 
 private:
     RsaKey(Session &s) : s_(s) {}
-    Session     &s_;
+    Session &s_;
     sss_object_t obj_{};
-    size_t       bits_ = 2048;
-    bool         owns_ = false; ///< false when opened (not generated) - no erase on close
+    size_t bits_ = 2048;
+    bool owns_ = false; ///< false when opened (not generated) - no erase on close
 };
 
 /**
@@ -224,9 +223,8 @@ private:
  * @return          PEM CSR.
  * @throws CryptoError on ASN.1 assembly failure.
  */
-std::string
-makeCsrFullSign(const std::string &subjectDn, const std::vector<uint8_t> &spki,
-                std::function<std::vector<uint8_t>(const std::vector<uint8_t> &)> sign);
+std::string makeCsrFullSign(const std::string &subjectDn, const std::vector<uint8_t> &spki,
+                            std::function<std::vector<uint8_t>(const std::vector<uint8_t> &)> sign);
 
 /**
  * @brief Convert a DER SubjectPublicKeyInfo to PEM.
