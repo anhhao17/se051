@@ -1,4 +1,4 @@
-/* demo_random_gen.c — C_GenerateRandom for several buffer sizes */
+/* demo_random_gen.c - C_GenerateRandom for several buffer sizes */
 #include "demo_common.h"
 
 int run_random_gen(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)

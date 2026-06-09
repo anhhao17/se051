@@ -19,7 +19,7 @@
  * Two output streams:
  *   Status/diagnostic (LOG_*): timestamped lines with source location.
  *     Always go to stderr; also written to the log file when --log is active.
- *   Result data (Log::get().print() / .hex()): raw output — hex, PEM,
+ *   Result data (Log::get().print() / .hex()): raw output - hex, PEM,
  *     "VERIFY OK", UID.  Goes to the log file, or stdout if no --log.
  *     No timestamp or location prefix so the output stays machine-readable.
  *
@@ -69,17 +69,21 @@ public:
         va_end(b);
     }
 
-    /** Result data output — no timestamp or location prefix. */
+    /** Result data output - no timestamp or location prefix. */
     void print(const char *fmt, ...) {
-        va_list ap; va_start(ap, fmt);
-        std::vfprintf(f_, fmt, ap); va_end(ap);
+        va_list ap;
+        va_start(ap, fmt);
+        std::vfprintf(f_, fmt, ap);
+        va_end(ap);
         std::fflush(f_);
     }
 
     /** Print bytes as lowercase hex followed by a newline. */
     void hex(const std::vector<uint8_t> &v) {
-        for (uint8_t b : v) std::fprintf(f_, "%02x", b);
-        std::fputc('\n', f_); std::fflush(f_);
+        for (uint8_t b : v)
+            std::fprintf(f_, "%02x", b);
+        std::fputc('\n', f_);
+        std::fflush(f_);
     }
 
 private:
@@ -88,16 +92,22 @@ private:
         if (own_ && !f_)
             throw std::runtime_error(std::string("cannot open log file: ") + path);
     }
-    ~Log() { if (own_ && f_) std::fclose(f_); }
+    ~Log() {
+        if (own_ && f_) std::fclose(f_);
+    }
     Log(const Log &)            = delete;
     Log &operator=(const Log &) = delete;
 
     static const char *tag(Level l) {
         switch (l) {
-            case DEBUG: return "[d]";
-            case INFO:  return "[i]";
-            case OK:    return "[+]";
-            case ERROR: return "[!]";
+        case DEBUG:
+            return "[d]";
+        case INFO:
+            return "[i]";
+        case OK:
+            return "[+]";
+        case ERROR:
+            return "[!]";
         }
         return "[?]";
     }
@@ -107,9 +117,9 @@ private:
         return s ? s + 1 : path;
     }
 
-    void writeLine(FILE *dst, Level lvl, const char *file, int line,
-                   const char *fmt, va_list ap) {
-        char ts[20];
+    void writeLine(FILE *dst, Level lvl, const char *file, int line, const char *fmt,
+                   va_list ap) {
+        char        ts[20];
         std::time_t t = std::time(nullptr);
         std::strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
         std::fprintf(dst, "%s %s %s:%d: ", ts, tag(lvl), shortname(file), line);
@@ -117,14 +127,14 @@ private:
         std::fflush(dst);
     }
 
-    FILE  *f_;
-    bool   own_;
-    Level  min_;
+    FILE *f_;
+    bool  own_;
+    Level min_;
 
     inline static Log *s_instance_ = nullptr;
 };
 
 #define LOG_DEBUG(...) Log::get().logAt(Log::DEBUG, __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_INFO(...)  Log::get().logAt(Log::INFO,  __FILE__, __LINE__, __VA_ARGS__)
-#define LOG_OK(...)    Log::get().logAt(Log::OK,    __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_INFO(...) Log::get().logAt(Log::INFO, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_OK(...) Log::get().logAt(Log::OK, __FILE__, __LINE__, __VA_ARGS__)
 #define LOG_ERROR(...) Log::get().logAt(Log::ERROR, __FILE__, __LINE__, __VA_ARGS__)

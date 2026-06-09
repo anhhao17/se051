@@ -17,7 +17,7 @@
  *   @c 0xXXXXXXXX.  Use Pkcs11Ctx::label() to format an ID.
  *
  * Signature format note:
- *   signRsa()  uses CKM_SHA256_RSA_PKCS — the SE performs SHA-256 hashing
+ *   signRsa()  uses CKM_SHA256_RSA_PKCS - the SE performs SHA-256 hashing
  *   internally.  The returned bytes are a raw PKCS#1 v1.5 RSA signature.
  *   verifyRsa() expects the same format.
  *   This means sign() / verify() both take the *full message*, not a digest.
@@ -47,8 +47,7 @@ public:
      * @param msg  Human-readable description of the failure.
      * @param rv   CK_RV return value from the failing call (default: CKR_GENERAL_ERROR).
      */
-    explicit Pkcs11Error(const std::string &msg,
-                         CK_RV rv = CKR_GENERAL_ERROR);
+    explicit Pkcs11Error(const std::string &msg, CK_RV rv = CKR_GENERAL_ERROR);
 
     /** @return The CK_RV code that triggered this exception. */
     CK_RV rv() const { return rv_; }
@@ -86,7 +85,7 @@ public:
      */
     ~Pkcs11Ctx();
 
-    Pkcs11Ctx(const Pkcs11Ctx &) = delete;
+    Pkcs11Ctx(const Pkcs11Ctx &)            = delete;
     Pkcs11Ctx &operator=(const Pkcs11Ctx &) = delete;
 
     /**
@@ -100,8 +99,8 @@ public:
      * @return      Pair of {public-key handle, private-key handle}.
      * @throws Pkcs11Error on SE or PKCS#11 failure.
      */
-    std::pair<CK_OBJECT_HANDLE, CK_OBJECT_HANDLE>
-    genRsaKeyPair(uint32_t id, CK_ULONG bits);
+    std::pair<CK_OBJECT_HANDLE, CK_OBJECT_HANDLE> genRsaKeyPair(uint32_t id,
+                                                                CK_ULONG bits);
 
     /**
      * @brief Find a key object by SE object ID and PKCS#11 key class.
@@ -133,7 +132,6 @@ public:
      */
     std::vector<uint8_t> getSpki(uint32_t id);
 
-
     /**
      * @brief Sign a message with RSA PKCS#1 v1.5 / SHA-256.
      *
@@ -145,8 +143,7 @@ public:
      * @return       Raw PKCS#1 v1.5 signature (keySize/8 bytes).
      * @throws Pkcs11Error on failure.
      */
-    std::vector<uint8_t> signRsa(CK_OBJECT_HANDLE hPriv,
-                                 const std::vector<uint8_t> &msg);
+    std::vector<uint8_t> signRsa(CK_OBJECT_HANDLE hPriv, const std::vector<uint8_t> &msg);
 
     /**
      * @brief Verify an RSA PKCS#1 v1.5 / SHA-256 signature.
@@ -158,8 +155,7 @@ public:
      * @param sig   Signature produced by signRsa().
      * @return      true if valid, false otherwise (no exception on mismatch).
      */
-    bool verifyRsa(CK_OBJECT_HANDLE hPub,
-                   const std::vector<uint8_t> &msg,
+    bool verifyRsa(CK_OBJECT_HANDLE hPub, const std::vector<uint8_t> &msg,
                    const std::vector<uint8_t> &sig);
 
     /**
@@ -170,7 +166,7 @@ public:
      * @return       Ciphertext.
      * @throws Pkcs11Error on failure or oversized input.
      */
-    std::vector<uint8_t> encryptRsa(CK_OBJECT_HANDLE hPub,
+    std::vector<uint8_t> encryptRsa(CK_OBJECT_HANDLE            hPub,
                                     const std::vector<uint8_t> &plain);
 
     /**
@@ -181,7 +177,7 @@ public:
      * @return       Plaintext.
      * @throws Pkcs11Error on failure.
      */
-    std::vector<uint8_t> decryptRsa(CK_OBJECT_HANDLE hPriv,
+    std::vector<uint8_t> decryptRsa(CK_OBJECT_HANDLE            hPriv,
                                     const std::vector<uint8_t> &cipher);
 
     /**
@@ -193,9 +189,8 @@ public:
     std::vector<uint8_t> getRandom(size_t n);
 
 private:
-    static std::string           label(uint32_t id);
+    static std::string            label(uint32_t id);
     static std::array<CK_BYTE, 4> idBytes(uint32_t id);
-
 
     void                *lib_   = nullptr;
     CK_FUNCTION_LIST_PTR p11_   = nullptr;

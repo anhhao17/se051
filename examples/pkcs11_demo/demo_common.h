@@ -34,7 +34,7 @@ static inline void print_hex(const char *label, const CK_BYTE *buf, CK_ULONG len
     printf("\n");
 }
 
-/* CK_CHECK — requires local `int rc = 0` and `cleanup:` label in caller */
+/* CK_CHECK - requires local `int rc = 0` and `cleanup:` label in caller */
 #define CK_CHECK(call) \
     do { \
         CK_RV _rv = (call); \

@@ -1,5 +1,5 @@
 /*
- * demo_ecdh_derive.c — ECDH key derivation via CKM_ECDH1_DERIVE
+ * demo_ecdh_derive.c - ECDH key derivation via CKM_ECDH1_DERIVE
  *
  * Generates two EC P-256 key pairs on the SE (Alice/Bob), then derives a
  * shared secret from each side and verifies they match.
@@ -89,7 +89,7 @@ int run_ecdh_derive(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
     CK_CHECK(p11->C_GetAttributeValue(session, hAlicePub, &aliceEcPointAttr, 1));
 
     /* ------------------------------------------------------------------ */
-    /* Derived key template — transient, 32-byte generic secret            */
+    /* Derived key template - transient, 32-byte generic secret            */
     /* ------------------------------------------------------------------ */
     CK_ULONG derivedKeyLen = 32;
     CK_ATTRIBUTE derivedTmpl[] = {
@@ -128,7 +128,7 @@ int run_ecdh_derive(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
     if (p11->C_GetAttributeValue(session, hShared1, &shared1Attr, 1) == CKR_OK)
         print_hex("  Shared (Alice side)", shared1, shared1Attr.ulValueLen);
     else
-        printf("  (Alice shared secret not extractable — stored on SE)\n");
+        printf("  (Alice shared secret not extractable - stored on SE)\n");
 
     /* ------------------------------------------------------------------ */
     /* Bob derives: priv=Bob, peer=Alice's EC point                         */
@@ -158,9 +158,9 @@ int run_ecdh_derive(CK_FUNCTION_LIST_PTR p11, CK_SESSION_HANDLE session)
             && memcmp(shared1, shared2, shared1Attr.ulValueLen) == 0)
             printf("  Shared secrets MATCH: ECDH OK\n");
         else
-            printf("  (Cannot compare — one side not extractable or mismatch)\n");
+            printf("  (Cannot compare - one side not extractable or mismatch)\n");
     } else {
-        printf("  (Bob shared secret not extractable — stored on SE)\n");
+        printf("  (Bob shared secret not extractable - stored on SE)\n");
     }
 
 cleanup:

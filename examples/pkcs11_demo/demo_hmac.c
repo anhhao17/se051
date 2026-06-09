@@ -1,5 +1,5 @@
 /*
- * demo_hmac.c — import a generic secret key, HMAC sign + verify with
+ * demo_hmac.c - import a generic secret key, HMAC sign + verify with
  *               SHA-1/256/384/512.
  *
  * Key ID: 0xEF000060.

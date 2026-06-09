@@ -25,7 +25,7 @@ list(APPEND SIMW_SE_SOURCES
     ${SIMW_LIB_DIR}/sss/src/mbedtls/fsl_sss_mbedtls_apis.c)
 
 # simw_lib.cmake leaves FLOW_VERBOSE commented out and NX_LOG_ENABLE_DEFAULT_DEBUG
-# defaults to 0 — translate the top-level SE05X_DEBUG_LOG option into the actual
+# defaults to 0 - translate the top-level SE05X_DEBUG_LOG option into the actual
 # compiler macros the P&T sources check (must precede add_executable).
 if(SE05X_DEBUG_LOG)
     add_compile_definitions(FLOW_VERBOSE NX_LOG_ENABLE_DEFAULT_DEBUG=1)

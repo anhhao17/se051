@@ -170,12 +170,12 @@ per unit. Engineer around it:
 | Phase | Command | Status |
 |-------|---------|--------|
 | 0 | `se uid` | **done** |
-| 2 | `rsa genkey --id 0xF0000001 --bits 2048 [--force]` | **done** — idempotent; reuses existing key unless `--force` |
-| 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | **done** — `sha256WithRSAEncryption` PKCS#1 v1.5 |
-| 5 | `rsa write-cert --id 0xF0000002 --in leaf.der` | **done** — SSS-only; idempotent erase-then-write |
-| 5 | `rsa verify-binding --id 0xF0000001 --cert leaf.der` | **done** — TRNG nonce → SE sign → mbedTLS verify |
+| 2 | `rsa genkey --id 0xF0000001 --bits 2048 [--force]` | **done** - idempotent; reuses existing key unless `--force` |
+| 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | **done** - `sha256WithRSAEncryption` PKCS#1 v1.5 |
+| 5 | `rsa write-cert --id 0xF0000002 --in leaf.der` | **done** - SSS-only; idempotent erase-then-write |
+| 5 | `rsa verify-binding --id 0xF0000001 --cert leaf.der` | **done** - TRNG nonce → SE sign → mbedTLS verify |
 | 6 | `set-policy --id 0xF0000001 --sign-only --no-read --no-write` | **not yet** |
-| 1 | `rotate-scp03` (KDF from UID) | **not yet** — irreversible, handle carefully |
+| 1 | `rotate-scp03` (KDF from UID) | **not yet** - irreversible, handle carefully |
 
 Standard crypto (genkey, sign, verify, encrypt, decrypt, csr, rng) is routed
 through PKCS#11 when `--pkcs11 <lib>` is given.  Management commands

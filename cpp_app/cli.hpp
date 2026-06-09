@@ -6,10 +6,10 @@
  * and format results for the terminal.  Session and backend lifecycle are external.
  *
  * Cli holds:
- *   crypto_ — ICryptoBackend reference for all crypto operations (genkey, sign,
+ *   crypto_ - ICryptoBackend reference for all crypto operations (genkey, sign,
  *              verify, encrypt, decrypt, csr, rng, pub).  Caller supplies either
  *              a Pkcs11Backend or an SssBackend; Cli never checks which.
- *   mgmt_   — nullable se05x::Session* for management-only operations (se uid,
+ *   mgmt_   - nullable se05x::Session* for management-only operations (se uid,
  *              rsa write-cert, rsa verify-binding) that have no PKCS#11 equivalent.
  */
 
@@ -55,12 +55,12 @@ public:
 private:
     /** @brief Parsed command-line arguments. */
     struct Args {
-        std::string group;       ///< First positional token (rng / se / rsa).
-        std::string command;     ///< Second positional token (uid / genkey / sign …).
-        std::string positional;  ///< Third positional token (used by rng for <nbytes>).
+        std::string group;      ///< First positional token (rng / se / rsa).
+        std::string command;    ///< Second positional token (uid / genkey / sign …).
+        std::string positional; ///< Third positional token (used by rng for <nbytes>).
         std::map<std::string, std::string> opt;
 
-        bool flag(const std::string &k) const { return opt.count(k) != 0; }
+        bool        flag(const std::string &k) const { return opt.count(k) != 0; }
         std::string get(const std::string &k, const std::string &def = "") const {
             auto it = opt.find(k);
             return it == opt.end() ? def : it->second;
@@ -75,16 +75,16 @@ private:
 
     static std::vector<uint8_t> readFile(const std::string &path);
     static void writeFile(const std::string &path, const std::vector<uint8_t> &d);
-    void emit(const Args &a, const std::vector<uint8_t> &d) const;
-    void emitSpki(const Args &a, const std::vector<uint8_t> &spki) const;
-    void emitText(const Args &a, const std::string &text) const;
+    void        emit(const Args &a, const std::vector<uint8_t> &d) const;
+    void        emitSpki(const Args &a, const std::vector<uint8_t> &spki) const;
+    void        emitText(const Args &a, const std::string &text) const;
 
-    static uint32_t        parseId(const Args &a);
-    static se05x::RsaBits  parseBits(const std::string &s);
+    static uint32_t       parseId(const Args &a);
+    static se05x::RsaBits parseBits(const std::string &s);
 
     /** @brief Return the management session, or throw if not available. */
     se05x::Session &mgmt() const;
 
-    ICryptoBackend  &crypto_;  ///< backend for all crypto operations
-    se05x::Session  *mgmt_;    ///< nullable — null for pure-crypto invocations
+    ICryptoBackend &crypto_; ///< backend for all crypto operations
+    se05x::Session *mgmt_;   ///< nullable - null for pure-crypto invocations
 };

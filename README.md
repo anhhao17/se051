@@ -18,7 +18,7 @@ The top-level `CMakeLists.txt` orchestrates three sub-builds in order:
 Fixed middleware options (match these to the hardware): `PTMW_Applet=SE05X_C`,
 `PTMW_SE05X_Ver=07_02` (SE051/052), `PTMW_HostCrypto=MBEDTLS`, `PTMW_SE05X_Auth=PlatfSCP03`.
 
-## `se05x_crypto_app` — the CLI
+## `se05x_crypto_app` - the CLI
 
 A single binary with two interchangeable crypto backends: the SSS API + mbedTLS directly,
 or `libsss_pkcs11.so` via `--pkcs11`. Only one secure channel is opened per invocation
@@ -59,9 +59,9 @@ Provisioning design and milestones live in [`docs/provisioning.md`](docs/provisi
 git submodule update --init --recursive
 ```
 
-- `ext/mbedtls/` — mbedTLS v2.28 LTS (do not bump to 3.x; see `CLAUDE.md`).
-- `ext/plug-and-trust/` — NXP Plug & Trust mini package.
-- `ext/se05x-pkcs11/` — NXP se05x-pkcs11 (only its `pkcs11` headers sub-submodule is used).
+- `ext/mbedtls/` - mbedTLS v2.28 LTS (do not bump to 3.x; see `CLAUDE.md`).
+- `ext/plug-and-trust/` - NXP Plug & Trust mini package.
+- `ext/se05x-pkcs11/` - NXP se05x-pkcs11 (only its `pkcs11` headers sub-submodule is used).
 
 ### Cross-compiler toolchains
 
@@ -101,12 +101,12 @@ Installed artifacts stage under `build/stage/` (`bin/se05x_crypto_app`,
 | `-DSE05X_DEBUG_LOG=` | OFF | Enable Plug & Trust verbose flow logging |
 
 The app sub-builds compile size-optimized (`-Os`, `-ffunction-sections -fdata-sections`
-with `-Wl,--gc-sections`, stripped) — important on memory-constrained ARM32 targets.
+with `-Wl,--gc-sections`, stripped) - important on memory-constrained ARM32 targets.
 Without an explicit build type CMake emits **no** `-O` flag (i.e. `-O0`), which on this
 target roughly doubled the binary and slowed the host-side SCP03 AES-CMAC; the superbuild
 sets `CMAKE_BUILD_TYPE=Release` for both app sub-builds to avoid that.
 
-**Clean rebuild** after a submodule version change: `rm -rf build` — ExternalProject stamp
+**Clean rebuild** after a submodule version change: `rm -rf build` - ExternalProject stamp
 caching will not otherwise detect the source change.
 
 ## Running
@@ -130,20 +130,14 @@ ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
     --id 0xF0000001 --in payload.bin --out payload.sig
 ```
 
-### Verifying a CSR
-
-```bash
-openssl req -in dev.csr -noout -text
-```
-
 ## Project structure
 
 ```
 .
-├── CMakeLists.txt           # Superbuild — mbedTLS → pkcs11_lib → cpp_app
+├── CMakeLists.txt           # Superbuild - mbedTLS → pkcs11_lib → cpp_app
 ├── armhf-toolchain.cmake    # Cross-toolchain for 32-bit ARM hard-float
 ├── aarch64-toolchain.cmake  # Cross-toolchain for 64-bit ARM
-├── cpp_app/                 # se05x_crypto_app — RSA provisioning CLI
+├── cpp_app/                 # se05x_crypto_app - RSA provisioning CLI
 │   ├── main.cpp             # Backend selection + session lifecycle
 │   ├── cli.cpp/.hpp         # Arg parsing and command dispatch
 │   ├── crypto_backend.*     # ICryptoBackend: Pkcs11Backend / SssBackend
@@ -167,20 +161,12 @@ openssl req -in dev.csr -noout -text
 
 | ID | Purpose |
 |---|---|
-| `0xFE000001` | CLI default RSA key (test range) |
+| `0xFE000001` | CLI default RSA key |
 | `0xF0000001` | Production device identity RSA key |
 | `0xF0000002` | Production device leaf certificate (DER) |
 
-Demo/reference keys in `examples/` use the `0xEF000000–0xEFFFFFFF` test range and are erased
+Demo/reference keys in `examples/` use the `0xEF000000-0xEFFFFFFF` test range and are erased
 before each run. `rsa genkey` is idempotent: an existing key is reused unless `--force` is given.
-
-## Branches
-
-| Branch | Adds |
-|---|---|
-| `main` | C demo + C++ wrappers over the SSS API (mbedTLS backend) |
-| `feat/pkcs11` | `libsss_pkcs11.so` + PKCS#11 demo suite |
-| `feat/privisioning` | Provisioning CLI: `se uid`, `write-cert`, `verify-binding`, idempotent `genkey`, logging |
 
 See `CLAUDE.md` for the non-obvious build details (mbedTLS 2.x backend swap, SCP03/CMAC
 requirement, SPKI format, CSR assembly).

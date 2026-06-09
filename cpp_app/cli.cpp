@@ -2,7 +2,7 @@
  * @file cli.cpp
  * @brief Cli method implementations.
  *
- * All crypto commands delegate to ICryptoBackend — there is no backend-specific
+ * All crypto commands delegate to ICryptoBackend - there is no backend-specific
  * branching here.  The caller (main.cpp) selects the concrete backend.
  *
  * SE management commands (se uid, rsa write-cert, rsa verify-binding) use the
@@ -19,8 +19,7 @@
 #include <fstream>
 #include <stdexcept>
 
-Cli::Cli(ICryptoBackend &crypto, se05x::Session *mgmt)
-    : crypto_(crypto), mgmt_(mgmt) {}
+Cli::Cli(ICryptoBackend &crypto, se05x::Session *mgmt) : crypto_(crypto), mgmt_(mgmt) {}
 
 se05x::Session &Cli::mgmt() const {
     if (!mgmt_)
@@ -31,12 +30,18 @@ se05x::Session &Cli::mgmt() const {
 }
 
 int Cli::run(int argc, char **argv) {
-    if (argc < 2) { usage(argv[0]); return 1; }
+    if (argc < 2) {
+        usage(argv[0]);
+        return 1;
+    }
     Args a = parse(argc, argv);
-    if (a.group.empty()) { usage(argv[0]); return 1; }
+    if (a.group.empty()) {
+        usage(argv[0]);
+        return 1;
+    }
 
     if (a.group == "rng") return doRng(a);
-    if (a.group == "se")  return doSe(a);
+    if (a.group == "se") return doSe(a);
     if (a.group == "rsa") return doRsa(a);
 
     usage(argv[0]);
@@ -44,32 +49,41 @@ int Cli::run(int argc, char **argv) {
 }
 
 Cli::Args Cli::parse(int argc, char **argv) {
-    Args a;
+    Args                     a;
     std::vector<std::string> pos;
     for (int i = 1; i < argc; ++i) {
         std::string t = argv[i];
         if (t.rfind("--", 0) == 0) {
-            if (t == "--force") { a.opt[t] = "1"; continue; }
-            if (i + 1 < argc)  { a.opt[t] = argv[++i]; }
-            else               { a.opt[t] = "1"; }
+            if (t == "--force") {
+                a.opt[t] = "1";
+                continue;
+            }
+            if (i + 1 < argc) {
+                a.opt[t] = argv[++i];
+            } else {
+                a.opt[t] = "1";
+            }
         } else {
             pos.push_back(t);
         }
     }
-    if (pos.size() > 0) a.group      = pos[0];
-    if (pos.size() > 1) a.command    = pos[1];
+    if (pos.size() > 0) a.group = pos[0];
+    if (pos.size() > 1) a.command = pos[1];
     if (pos.size() > 2) a.positional = pos[2];
     if (a.group == "rng" && a.positional.empty()) a.positional = a.command;
     return a;
 }
 
 void Cli::usage(const char *prog) {
-    std::fprintf(stderr,
-        "Usage: %s [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> [options]\n\n"
+    std::fprintf(
+        stderr,
+        "Usage: %s [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <command> "
+        "[options]\n\n"
         "Commands:\n"
         "  rng <nbytes>\n"
         "  se  uid\n"
-        "  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]\n"
+        "  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] "
+        "[--pem]\n"
         "  rsa pub            [--id <hex>=0xFE000001] [--out <file>] [--pem]\n"
         "  rsa sign           [--id <hex>=0xFE000001] --in <file>  [--out <file>]\n"
         "  rsa verify         [--id <hex>=0xFE000001] --in <file>  --sig <file>\n"
@@ -88,7 +102,7 @@ void Cli::usage(const char *prog) {
 std::vector<uint8_t> Cli::readFile(const std::string &path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) throw std::runtime_error("cannot open: " + path);
-    return { std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>() };
+    return {std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
 }
 
 void Cli::writeFile(const std::string &path, const std::vector<uint8_t> &d) {
@@ -118,7 +132,7 @@ void Cli::emitSpki(const Args &a, const std::vector<uint8_t> &spki) const {
 void Cli::emitText(const Args &a, const std::string &text) const {
     const std::string out = a.get("--out");
     if (!out.empty()) {
-        writeFile(out, { text.begin(), text.end() });
+        writeFile(out, {text.begin(), text.end()});
         LOG_OK("wrote %s\n", out.c_str());
     } else {
         Log::get().print("%s", text.c_str());
@@ -133,8 +147,8 @@ uint32_t Cli::parseId(const Args &a) {
 
 se05x::RsaBits Cli::parseBits(const std::string &s) {
     if (s.empty() || s == "2048") return se05x::RsaBits::Rsa2048;
-    if (s == "3072")              return se05x::RsaBits::Rsa3072;
-    if (s == "4096")              return se05x::RsaBits::Rsa4096;
+    if (s == "3072") return se05x::RsaBits::Rsa3072;
+    if (s == "4096") return se05x::RsaBits::Rsa4096;
     throw std::runtime_error("unknown RSA size: " + s);
 }
 
@@ -159,24 +173,22 @@ int Cli::doRsa(const Args &a) {
     const std::string &cmd = a.command;
 
     if (cmd == "genkey" || cmd == "provision") {
-        uint32_t id         = parseId(a);
+        uint32_t       id   = parseId(a);
         se05x::RsaBits bits = parseBits(a.get("--bits"));
 
         if (crypto_.keyExists(id)) {
             if (!a.flag("--force")) {
-                LOG_INFO("RSA key 0x%08X already exists (use --force to regenerate)\n", id);
-                if (!a.get("--out").empty())
-                    emitSpki(a, crypto_.getSpki(id));
+                LOG_INFO("RSA key 0x%08X already exists (use --force to regenerate)\n",
+                         id);
+                if (!a.get("--out").empty()) emitSpki(a, crypto_.getSpki(id));
                 return 0;
             }
             crypto_.deleteKey(id);
         }
-        LOG_INFO("RSA-%zu keygen on 0x%08X (~2-4 s)...\n",
-                 static_cast<size_t>(bits), id);
+        LOG_INFO("RSA-%zu keygen on 0x%08X (~2-4 s)...\n", static_cast<size_t>(bits), id);
         crypto_.generateKey(id, bits);
         LOG_OK("RSA key provisioned\n");
-        if (!a.get("--out").empty())
-            emitSpki(a, crypto_.getSpki(id));
+        if (!a.get("--out").empty()) emitSpki(a, crypto_.getSpki(id));
         return 0;
     }
 
@@ -192,8 +204,7 @@ int Cli::doRsa(const Args &a) {
 
     if (cmd == "verify") {
         uint32_t id = parseId(a);
-        bool ok     = crypto_.verify(id, readFile(a.get("--in")),
-                                         readFile(a.get("--sig")));
+        bool ok = crypto_.verify(id, readFile(a.get("--in")), readFile(a.get("--sig")));
         Log::get().print("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
         return ok ? 0 : 2;
     }
@@ -209,7 +220,7 @@ int Cli::doRsa(const Args &a) {
     }
 
     if (cmd == "csr") {
-        uint32_t id   = parseId(a);
+        uint32_t   id = parseId(a);
         const auto dn = a.get("--subject");
         if (dn.empty()) throw std::runtime_error("--subject is required");
         emitText(a, crypto_.makeCsr(id, dn));
@@ -217,8 +228,8 @@ int Cli::doRsa(const Args &a) {
     }
 
     if (cmd == "write-cert") {
-        uint32_t id = parseId(a);
-        auto der    = readFile(a.get("--in"));
+        uint32_t id  = parseId(a);
+        auto     der = readFile(a.get("--in"));
         se05x::writeCert(mgmt(), id, der);
         LOG_OK("certificate written (id=0x%08X, %zu bytes)\n", id, der.size());
         return 0;

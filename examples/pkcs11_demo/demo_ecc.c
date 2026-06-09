@@ -1,5 +1,5 @@
 /*
- * demo_ecc.c — EC key pair generation + ECDSA sign/verify
+ * demo_ecc.c - EC key pair generation + ECDSA sign/verify
  *
  * Tests P-256 (SHA-256), P-384 (SHA-384), P-521 (SHA-512) in sequence.
  * Keys are generated on the SE, signed, verified, then destroyed.

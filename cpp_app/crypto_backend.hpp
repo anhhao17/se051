@@ -4,11 +4,11 @@
  *
  * ICryptoBackend decouples Cli from the underlying crypto path.
  *
- * Pkcs11Backend — libsss_pkcs11.so via dlopen.
+ * Pkcs11Backend - libsss_pkcs11.so via dlopen.
  *   Sign/verify : CKM_SHA256_RSA_PKCS  (SE hashes internally; pass full message)
  *   Enc/dec     : CKM_RSA_PKCS_OAEP / SHA-256 / MGF1-SHA256
  *
- * SssBackend    — NXP SSS API + mbedTLS directly (no PKCS#11 library needed).
+ * SssBackend    - NXP SSS API + mbedTLS directly (no PKCS#11 library needed).
  *   Sign/verify : SHA-256 computed by mbedTLS, digest signed by SE
  *   Enc/dec     : RSA-OAEP-SHA256 via sss_asymmetric
  *
@@ -60,23 +60,21 @@ public:
      * Pass the full message; the backend hashes internally.
      * Returns raw PKCS#1 v1.5 signature bytes.
      */
-    virtual std::vector<uint8_t> sign(uint32_t id,
-                                      const std::vector<uint8_t> &msg) = 0;
+    virtual std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) = 0;
 
     /**
      * @brief Verify a RSASSA-PKCS1-v1_5 / SHA-256 @p sig over @p msg.
      * @return true if the signature is valid.
      */
-    virtual bool verify(uint32_t id,
-                        const std::vector<uint8_t> &msg,
+    virtual bool verify(uint32_t id, const std::vector<uint8_t> &msg,
                         const std::vector<uint8_t> &sig) = 0;
 
     /** @brief Encrypt @p plain with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> encrypt(uint32_t id,
+    virtual std::vector<uint8_t> encrypt(uint32_t                    id,
                                          const std::vector<uint8_t> &plain) = 0;
 
     /** @brief Decrypt @p cipher with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> decrypt(uint32_t id,
+    virtual std::vector<uint8_t> decrypt(uint32_t                    id,
                                          const std::vector<uint8_t> &cipher) = 0;
 
     /**
@@ -87,7 +85,7 @@ public:
 };
 
 /**
- * @brief PKCS#11 backend — all operations through @c libsss_pkcs11.so.
+ * @brief PKCS#11 backend - all operations through @c libsss_pkcs11.so.
  */
 class Pkcs11Backend final : public ICryptoBackend {
 public:
@@ -97,24 +95,25 @@ public:
      */
     explicit Pkcs11Backend(const std::string &libPath);
 
-    std::vector<uint8_t> getRandom(size_t n)                                   override;
-    bool                 keyExists(uint32_t id)                                 override;
-    void                 deleteKey(uint32_t id)                                 override;
-    void                 generateKey(uint32_t id, se05x::RsaBits bits)          override;
-    std::vector<uint8_t> getSpki(uint32_t id)                                  override;
-    std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg)    override;
+    std::vector<uint8_t> getRandom(size_t n) override;
+    bool                 keyExists(uint32_t id) override;
+    void                 deleteKey(uint32_t id) override;
+    void                 generateKey(uint32_t id, se05x::RsaBits bits) override;
+    std::vector<uint8_t> getSpki(uint32_t id) override;
+    std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
-                                const std::vector<uint8_t> &sig)               override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain)  override;
-    std::vector<uint8_t> decrypt(uint32_t id, const std::vector<uint8_t> &cipher) override;
-    std::string          makeCsr(uint32_t id, const std::string &subjectDn)    override;
+                                const std::vector<uint8_t> &sig) override;
+    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
+    std::vector<uint8_t> decrypt(uint32_t                    id,
+                                 const std::vector<uint8_t> &cipher) override;
+    std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
     Pkcs11Ctx ctx_;
 };
 
 /**
- * @brief SSS + mbedTLS backend — no PKCS#11 library required.
+ * @brief SSS + mbedTLS backend - no PKCS#11 library required.
  *
  * @note The Session must outlive this object.
  */
@@ -122,17 +121,18 @@ class SssBackend final : public ICryptoBackend {
 public:
     explicit SssBackend(se05x::Session &session);
 
-    std::vector<uint8_t> getRandom(size_t n)                                   override;
-    bool                 keyExists(uint32_t id)                                 override;
-    void                 deleteKey(uint32_t id)                                 override;
-    void                 generateKey(uint32_t id, se05x::RsaBits bits)          override;
-    std::vector<uint8_t> getSpki(uint32_t id)                                  override;
-    std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg)    override;
+    std::vector<uint8_t> getRandom(size_t n) override;
+    bool                 keyExists(uint32_t id) override;
+    void                 deleteKey(uint32_t id) override;
+    void                 generateKey(uint32_t id, se05x::RsaBits bits) override;
+    std::vector<uint8_t> getSpki(uint32_t id) override;
+    std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
-                                const std::vector<uint8_t> &sig)               override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain)  override;
-    std::vector<uint8_t> decrypt(uint32_t id, const std::vector<uint8_t> &cipher) override;
-    std::string          makeCsr(uint32_t id, const std::string &subjectDn)    override;
+                                const std::vector<uint8_t> &sig) override;
+    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
+    std::vector<uint8_t> decrypt(uint32_t                    id,
+                                 const std::vector<uint8_t> &cipher) override;
+    std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
     se05x::Session &session_;

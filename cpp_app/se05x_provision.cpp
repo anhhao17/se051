@@ -1,6 +1,6 @@
 /**
  * @file se05x_provision.cpp
- * @brief SE05x provisioning helpers — UID, certificate storage, binding verification.
+ * @brief SE05x provisioning helpers - UID, certificate storage, binding verification.
  */
 
 #include "se05x_provision.hpp"
@@ -34,15 +34,15 @@ std::vector<uint8_t> sha256v(const std::vector<uint8_t> &in) {
 
 std::vector<uint8_t> readUid(Session &s) {
     LOG_DEBUG("readUid: requesting 18-byte chip UID\n");
-    constexpr size_t kUidLen = 18;
+    constexpr size_t     kUidLen = 18;
     std::vector<uint8_t> uid(kUidLen);
-    size_t uidLen = uid.size();
-    sss_status_t st = sss_session_prop_get_au8(
-        s.session(), kSSS_SessionProp_UID, uid.data(), &uidLen);
+    size_t               uidLen = uid.size();
+    sss_status_t         st =
+        sss_session_prop_get_au8(s.session(), kSSS_SessionProp_UID, uid.data(), &uidLen);
     if (st != kStatus_SSS_Success)
-        throw CryptoError(
-            "readUid failed (0x6982 = SCP03 not established; "
-            "set EX_SSS_BOOT_SCP03_PATH or verify SCP03 keys match the SE)", st);
+        throw CryptoError("readUid failed (0x6982 = SCP03 not established; "
+                          "set EX_SSS_BOOT_SCP03_PATH or verify SCP03 keys match the SE)",
+                          st);
     uid.resize(uidLen);
     return uid;
 }
@@ -51,8 +51,7 @@ std::vector<uint8_t> readUid(Session &s) {
 
 bool objectExists(Session &s, uint32_t id) {
     sss_object_t obj{};
-    if (sss_key_object_init(&obj, s.keystore()) != kStatus_SSS_Success)
-        return false;
+    if (sss_key_object_init(&obj, s.keystore()) != kStatus_SSS_Success) return false;
     sss_status_t st = sss_key_object_get_handle(&obj, id);
     sss_key_object_free(&obj);
     return (st == kStatus_SSS_Success);
@@ -72,28 +71,20 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
     }
 
     sss_object_t obj{};
-    check(sss_key_object_init(&obj, s.keystore()),
-          "sss_key_object_init");
-    check(sss_key_object_allocate_handle(
-              &obj, id,
-              kSSS_KeyPart_Default,
-              kSSS_CipherType_Binary,
-              der.size(),
-              kKeyObject_Mode_Persistent),
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init");
+    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default,
+                                         kSSS_CipherType_Binary, der.size(),
+                                         kKeyObject_Mode_Persistent),
           "sss_key_object_allocate_handle(cert)");
-    check(sss_key_store_set_key(
-              s.keystore(), &obj,
-              der.data(), der.size(),
-              der.size() * 8,
-              nullptr, 0),
+    check(sss_key_store_set_key(s.keystore(), &obj, der.data(), der.size(),
+                                der.size() * 8, nullptr, 0),
           "sss_key_store_set_key(cert)");
     sss_key_object_free(&obj);
 }
 
 // Binding verification
 
-bool verifyBindingRsa(Session &s, uint32_t keyId,
-                      const std::vector<uint8_t> &certDer) {
+bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &certDer) {
     LOG_DEBUG("verifyBinding: key=0x%08X, cert=%zu bytes\n", keyId, certDer.size());
 
     LOG_DEBUG("verifyBinding: generating 32-byte TRNG nonce\n");
@@ -111,8 +102,7 @@ bool verifyBindingRsa(Session &s, uint32_t keyId,
         mbedtls_x509_crt_free(&crt);
         throw std::runtime_error("verifyBindingRsa: cannot parse certificate");
     }
-    r = mbedtls_pk_verify(&crt.pk, MBEDTLS_MD_SHA256,
-                          digest.data(), digest.size(),
+    r = mbedtls_pk_verify(&crt.pk, MBEDTLS_MD_SHA256, digest.data(), digest.size(),
                           sig.data(), sig.size());
     mbedtls_x509_crt_free(&crt);
     LOG_DEBUG("verifyBinding: mbedTLS result %d (%s)\n", r, r == 0 ? "OK" : "FAIL");
