@@ -122,12 +122,16 @@ class RsaKey {
 public:
     /**
      * @brief Generate a fresh RSA key pair on the SE and persist it.
-     * @param s     Active session.
-     * @param keyId SE object ID to allocate.
-     * @param bits  Key size.
+     *
+     * @param s       Active session.
+     * @param keyId   SE object ID to allocate.
+     * @param bits    Key size.
+     * @param policy  SE05x object policy to apply at creation time (immutable
+     *                after).  Pass @c nullptr for no restrictions.
      * @throws CryptoError on SE failure.
      */
-    static RsaKey generate(Session &s, uint32_t keyId, RsaBits bits);
+    static RsaKey generate(Session &s, uint32_t keyId, RsaBits bits,
+                           sss_policy_t *policy = nullptr);
 
     /**
      * @brief Bind to an existing persisted RSA key object.

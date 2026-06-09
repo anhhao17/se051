@@ -40,7 +40,7 @@ void Pkcs11Backend::deleteKey(uint32_t id) {
     ctx_.destroyObject(ctx_.findKey(id, CKO_PUBLIC_KEY));
 }
 
-void Pkcs11Backend::generateKey(uint32_t id, se05x::RsaBits bits) {
+void Pkcs11Backend::generateKey(uint32_t id, se05x::RsaBits bits, se05x::KeyPolicy /*policy*/) {
     LOG_DEBUG("pkcs11: genRsaKeyPair id=0x%08X bits=%lu\n", id,
               static_cast<unsigned long>(bits));
     ctx_.genRsaKeyPair(id, static_cast<CK_ULONG>(bits));
@@ -101,10 +101,10 @@ void SssBackend::deleteKey(uint32_t id) {
     if (se05x::objectExists(session_, id)) se05x::eraseKey(session_, id);
 }
 
-void SssBackend::generateKey(uint32_t id, se05x::RsaBits bits) {
+void SssBackend::generateKey(uint32_t id, se05x::RsaBits bits, se05x::KeyPolicy policy) {
     LOG_DEBUG("sss: RsaKey::generate id=0x%08X bits=%zu\n", id,
               static_cast<size_t>(bits));
-    se05x::RsaKey::generate(session_, id, bits);
+    se05x::generateKeyWithPolicy(session_, id, bits, policy);
 }
 
 std::vector<uint8_t> SssBackend::getSpki(uint32_t id) {

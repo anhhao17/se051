@@ -13,6 +13,7 @@
 extern "C" {
 #include <fsl_sss_api.h>
 #include <fsl_sss_se05x_apis.h>
+#include <fsl_sss_se05x_policy.h>
 #include "mbedtls/sha256.h"
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/pk.h"
@@ -107,6 +108,44 @@ bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &ce
     mbedtls_x509_crt_free(&crt);
     LOG_DEBUG("verifyBinding: mbedTLS result %d (%s)\n", r, r == 0 ? "OK" : "FAIL");
     return (r == 0);
+}
+
+// Key generation with policy
+
+RsaKey generateKeyWithPolicy(Session &s, uint32_t keyId, RsaBits bits, KeyPolicy policy) {
+    if (policy == KeyPolicy::Full) {
+        return RsaKey::generate(s, keyId, bits, nullptr);
+    }
+
+    // SE05x 07.02 policy notes (see fsl_sss_se05x_policy.c):
+    //   - Asym key policy handles: can_Sign, can_Decrypt, can_Gen, can_Import_Export
+    //   - Common policy handles:   can_Read, can_Write, can_Delete, req_Sm
+    //   - Asym "old policies" (can_Read, can_Write) are silently ignored on 07.02
+
+    sss_policy_u asymPol{};
+    asymPol.type                        = KPolicy_Asym_Key;
+    asymPol.auth_obj_id                 = 0;
+    asymPol.policy.asymmkey.can_Sign    = 1;
+    asymPol.policy.asymmkey.can_Decrypt = (policy == KeyPolicy::SignDecrypt) ? 1 : 0;
+    asymPol.policy.asymmkey.can_Gen     = 1; // needed for on-chip generation
+    // can_Import_Export = 0  ->  private key cannot be exported
+
+    sss_policy_u commonPol{};
+    commonPol.type                     = KPolicy_Common;
+    commonPol.auth_obj_id              = 0;
+    commonPol.policy.common.can_Read   = 1; // allow public key read (needed for CSR / rsa pub)
+    commonPol.policy.common.can_Write  = 0; // prevent overwriting key material after creation
+    commonPol.policy.common.can_Delete = 0; // non-deletable once provisioned
+    commonPol.policy.common.req_Sm     = 1; // all operations require SCP03
+
+    sss_policy_t pol{};
+    pol.policies[0] = &asymPol;
+    pol.policies[1] = &commonPol;
+    pol.nPolicies   = 2;
+
+    LOG_DEBUG("generateKeyWithPolicy: id=0x%08X policy=%s\n", keyId,
+              policy == KeyPolicy::SignOnly ? "sign-only" : "sign-decrypt");
+    return RsaKey::generate(s, keyId, bits, &pol);
 }
 
 } // namespace se05x

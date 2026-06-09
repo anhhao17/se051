@@ -174,7 +174,7 @@ per unit. Engineer around it:
 | 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | **done** - `sha256WithRSAEncryption` PKCS#1 v1.5 |
 | 5 | `rsa write-cert --id 0xF0000002 --in leaf.der` | **done** - SSS-only; idempotent erase-then-write |
 | 5 | `rsa verify-binding --id 0xF0000001 --cert leaf.der` | **done** - TRNG nonce → SE sign → mbedTLS verify |
-| 6 | `set-policy --id 0xF0000001 --sign-only --no-read --no-write` | **not yet** |
+| 6 | `rsa genkey --id 0xF0000001 --policy sign-decrypt` (policy set at creation time) | **done** — set via `--policy` flag on `rsa genkey` |
 | 1 | `rotate-scp03` (KDF from UID) | **not yet** - irreversible, handle carefully |
 
 Standard crypto (genkey, sign, verify, encrypt, decrypt, csr, rng) is routed
@@ -273,7 +273,8 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
 
   rng    <nbytes>
   se     uid
-  rsa    genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]
+  rsa    genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force]
+               [--policy full|sign-only|sign-decrypt]
   rsa    pub    [--id <hex>] [--out <file>] [--pem]
   rsa    sign   [--id <hex>] --in <file>  [--out <file>]
   rsa    verify [--id <hex>] --in <file>  --sig <file>
@@ -285,7 +286,6 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
   rsa    verify-binding  --id 0xF0000001  --cert leaf.der
 
   Not yet implemented:
-  rsa    set-policy      --id 0xF0000001 --sign-only --no-read --no-write
          rotate-scp03    (derive per-device keys from UID; irreversible)
 ```
 

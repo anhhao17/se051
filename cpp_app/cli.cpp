@@ -82,8 +82,8 @@ void Cli::usage(const char *prog) {
         "Commands:\n"
         "  rng <nbytes>\n"
         "  se  uid\n"
-        "  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] "
-        "[--pem]\n"
+        "  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force]\n"
+        "                     [--policy full|sign-only|sign-decrypt] [--out <file>]\n"
         "  rsa pub            [--id <hex>=0xFE000001] [--out <file>] [--pem]\n"
         "  rsa sign           [--id <hex>=0xFE000001] --in <file>  [--out <file>]\n"
         "  rsa verify         [--id <hex>=0xFE000001] --in <file>  --sig <file>\n"
@@ -152,6 +152,13 @@ se05x::RsaBits Cli::parseBits(const std::string &s) {
     throw std::runtime_error("unknown RSA size: " + s);
 }
 
+se05x::KeyPolicy Cli::parsePolicy(const std::string &s) {
+    if (s.empty() || s == "full") return se05x::KeyPolicy::Full;
+    if (s == "sign-only") return se05x::KeyPolicy::SignOnly;
+    if (s == "sign-decrypt") return se05x::KeyPolicy::SignDecrypt;
+    throw std::runtime_error("unknown policy: " + s + " (use: full, sign-only, sign-decrypt)");
+}
+
 int Cli::doRng(const Args &a) {
     if (a.positional.empty()) throw std::runtime_error("usage: rng <nbytes>");
     size_t n = std::strtoul(a.positional.c_str(), nullptr, 0);
@@ -173,8 +180,12 @@ int Cli::doRsa(const Args &a) {
     const std::string &cmd = a.command;
 
     if (cmd == "genkey" || cmd == "provision") {
-        uint32_t       id   = parseId(a);
-        se05x::RsaBits bits = parseBits(a.get("--bits"));
+        uint32_t         id     = parseId(a);
+        se05x::RsaBits   bits   = parseBits(a.get("--bits"));
+        se05x::KeyPolicy policy = parsePolicy(a.get("--policy"));
+
+        if (policy != se05x::KeyPolicy::Full && a.flag("--pkcs11"))
+            LOG_INFO("--policy is ignored with --pkcs11 (PKCS#11 keygen has no SSS policy)\n");
 
         if (crypto_.keyExists(id)) {
             if (!a.flag("--force")) {
@@ -186,7 +197,7 @@ int Cli::doRsa(const Args &a) {
             crypto_.deleteKey(id);
         }
         LOG_INFO("RSA-%zu keygen on 0x%08X (~2-4 s)...\n", static_cast<size_t>(bits), id);
-        crypto_.generateKey(id, bits);
+        crypto_.generateKey(id, bits, policy);
         LOG_OK("RSA key provisioned\n");
         if (!a.get("--out").empty()) emitSpki(a, crypto_.getSpki(id));
         return 0;

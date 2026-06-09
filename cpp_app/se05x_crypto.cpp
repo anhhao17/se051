@@ -40,7 +40,7 @@ std::vector<uint8_t> getRandom(Session &s, size_t numBytes) {
     return out;
 }
 
-RsaKey RsaKey::generate(Session &s, uint32_t keyId, RsaBits bits) {
+RsaKey RsaKey::generate(Session &s, uint32_t keyId, RsaBits bits, sss_policy_t *policy) {
     RsaKey k(s);
     k.bits_ = static_cast<size_t>(bits);
     k.owns_ = true;
@@ -51,7 +51,7 @@ RsaKey RsaKey::generate(Session &s, uint32_t keyId, RsaBits bits) {
                                          kKeyObject_Mode_Persistent),
           "key_object_allocate_handle(RSA)");
     check(sss_key_store_generate_key(s.keystore(), &k.obj_,
-                                     static_cast<uint32_t>(k.bits_), nullptr),
+                                     static_cast<uint32_t>(k.bits_), policy),
           "key_store_generate_key(RSA)");
     return k;
 }

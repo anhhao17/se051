@@ -185,7 +185,8 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
 
   rng <nbytes>
   se  uid                                                  # 18-byte chip UID (SSS only)
-  rsa genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force] [--pem]
+  rsa genkey [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force]
+             [--policy full|sign-only|sign-decrypt]
   rsa pub / sign / verify / encrypt / decrypt / csr
   rsa write-cert     --id <id> --in <cert.der>             # SSS only; idempotent erase-then-write
   rsa verify-binding --id <id> --cert <cert.der>           # SSS only; TRNG nonce→SE sign→mbedTLS verify
@@ -193,13 +194,19 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
 
 - **Idempotent genkey**: checks `se05x::objectExists()` first; with an existing key and no
   `--force`, exits 0 cleanly (re-emits SPKI only if `--out` is set).
+- **Object policy** (`--policy`): SE05x policies are **immutable after key creation**. Pass
+  `--policy sign-only` or `--policy sign-decrypt` at genkey time to enforce SCP03-required,
+  non-exportable, non-deletable. `--policy full` (default) creates unrestricted keys.
+  Policy is ignored by the PKCS#11 backend. Implementation: `se05x::generateKeyWithPolicy()`
+  in `se05x_provision.cpp`; uses `sss_policy_asym_key_u` (sign/decrypt/gen) + `sss_policy_common_u`
+  (req_Sm=1, can_Delete=0, can_Write=0, can_Read=1) passed as `options` to `sss_key_store_generate_key`.
 - **Key IDs**: CLI default `0xFE000001` (test range). Production provisioning uses `0xF0000001`
   (key) / `0xF0000002` (cert).
 - **Connect string** via `--port` or `$EX_SSS_BOOT_SSS_PORT` (e.g. `/dev/i2c-1:0x48`).
-- **Not yet implemented**: `set-policy` (lock key to sign-only), `rotate-scp03` (per-device SCP03
-  key KDF from UID - irreversible; treat carefully).
+- **Not yet implemented**: `rotate-scp03` (per-device SCP03 key KDF from UID - irreversible; treat
+  carefully).
 - **Plan/status**: `docs/provisioning.md`, `docs/provisioning_plan.md`. M1 (build), M2 (PKCS#11),
-  M4 (provisioning cmds) done; M3 (SE mgmt), M5–M6 not started.
+  M4 (provisioning cmds), M3 policy done; `rotate-scp03` and M5–M6 not started.
 
 ## Key ID safe range
 

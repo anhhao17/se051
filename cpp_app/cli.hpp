@@ -79,8 +79,9 @@ private:
     void        emitSpki(const Args &a, const std::vector<uint8_t> &spki) const;
     void        emitText(const Args &a, const std::string &text) const;
 
-    static uint32_t       parseId(const Args &a);
-    static se05x::RsaBits parseBits(const std::string &s);
+    static uint32_t          parseId(const Args &a);
+    static se05x::RsaBits    parseBits(const std::string &s);
+    static se05x::KeyPolicy  parsePolicy(const std::string &s);
 
     /** @brief Return the management session, or throw if not available. */
     se05x::Session &mgmt() const;
