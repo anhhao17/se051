@@ -2,10 +2,11 @@
  * @file commands.cpp
  * @brief Concrete CLI commands and the registry that owns them.
  *
- * Each command does one operation and declares the session it needs.  Crypto
- * operations go through ctx.crypto (PKCS#11 or SSS); SE-management operations
- * (uid, cert, binding) and rotation use ctx.requireMgmt().  Output goes through
- * ctx.out.  None of them parse argv or open sessions - that is main()'s job.
+ * Each command does one operation and declares the session it needs.  All SE
+ * operations go through the ctx.api facade (crypto via SSS/PKCS#11, management
+ * via SSS); only PlatformSCP03 rotation uses the raw ctx.requireIsd() session.
+ * Output goes through ctx.out.  None of them parse argv or open sessions - that
+ * is main()'s job.
  */
 
 #include "commands.hpp"
@@ -14,9 +15,6 @@
 
 #include "scp03_keyfile.hpp"
 #include "scp03_rotate.hpp"
-#include "se05x_crypto.hpp"
-#include "se05x_object_store.hpp"
-#include "se05x_provision.hpp"
 #include "keys.hpp"
 
 #include <array>
@@ -28,11 +26,11 @@
 #include <string>
 
 // CommandContext helper (declared in command.hpp).
-se05x::Session &CommandContext::requireMgmt() const {
-    if (!mgmt)
-        throw std::runtime_error("this command needs a direct SE session; omit --pkcs11 and set "
+se05x::Session &CommandContext::requireIsd() const {
+    if (!isd)
+        throw std::runtime_error("this command needs an ISD session; omit --pkcs11 and set "
                                  "--port / $EX_SSS_BOOT_SSS_PORT");
-    return *mgmt;
+    return *isd;
 }
 
 namespace {
@@ -130,7 +128,7 @@ public:
         if (a.positional.empty())
             throw std::runtime_error("usage: rng <nbytes>");
         size_t n = std::strtoul(a.positional.c_str(), nullptr, 0);
-        ctx.out.bytes(a, ctx.crypto.getRandom(n));
+        ctx.out.bytes(a, ctx.api.randomBytes(n));
         return 0;
     }
 };
@@ -144,7 +142,7 @@ public:
     }
     SessionNeed sessionNeed() const override { return SessionNeed::Management; }
     int run(CommandContext &ctx, const Args &) const override {
-        auto uid = se05x::readUid(ctx.requireMgmt());
+        auto uid = ctx.api.uid();
         Log::get().print("UID (%zu bytes): ", uid.size());
         Log::get().hex(uid);
         return 0;
@@ -173,7 +171,7 @@ public:
         std::memcpy(keys.mac, mac.data(), 16);
         std::memcpy(keys.dek, dek.data(), 16);
 
-        se05x::rotateScp03(ctx.requireMgmt(), keys, dryRun);
+        se05x::rotateScp03(ctx.requireIsd(), keys, dryRun);
         if (dryRun)
             return 0;
 
@@ -219,7 +217,7 @@ public:
         const uint32_t id = parseId(a, kDeviceInfoId);
         auto data = infoData(a);
         const bool force = a.flag("--force");
-        bool wrote = se05x::writeBinary(ctx.requireMgmt(), id, data, force);
+        bool wrote = ctx.api.writeBinary(id, data, force);
         if (wrote)
             LOG_OK("wrote %zu bytes to 0x%08X\n", data.size(), id);
         else
@@ -237,7 +235,7 @@ public:
     }
     SessionNeed sessionNeed() const override { return SessionNeed::Management; }
     int run(CommandContext &ctx, const Args &a) const override {
-        auto data = se05x::readBinary(ctx.requireMgmt(), parseId(a, kDeviceInfoId));
+        auto data = ctx.api.readBinary(parseId(a, kDeviceInfoId));
         if (!a.get("--out").empty()) {
             ctx.out.bytes(a, data); // write raw bytes to file
         } else {
@@ -259,7 +257,7 @@ public:
     int run(CommandContext &ctx, const Args &a) const override {
         const uint32_t id = parseId(a, kDeviceInfoId);
         auto expected = infoData(a);
-        auto actual = se05x::readBinary(ctx.requireMgmt(), id);
+        auto actual = ctx.api.readBinary(id);
         bool ok = (actual == expected);
         ctx.out.line("%s\n", ok ? "PASS" : "FAIL");
         if (!ok)
@@ -287,20 +285,20 @@ public:
         if (policy != se05x::KeyPolicy::Full && a.flag("--pkcs11"))
             LOG_INFO("--policy is ignored with --pkcs11 (PKCS#11 keygen has no SSS policy)\n");
 
-        if (ctx.crypto.keyExists(id)) {
+        if (ctx.api.keyExists(id)) {
             if (!a.flag("--force")) {
                 LOG_INFO("RSA key 0x%08X already exists (use --force to regenerate)\n", id);
                 if (!a.get("--out").empty())
-                    ctx.out.spki(a, ctx.crypto.getSpki(id));
+                    ctx.out.spki(a, ctx.api.publicKeyDer(id));
                 return 0;
             }
-            ctx.crypto.deleteKey(id);
+            ctx.api.deleteKey(id);
         }
         LOG_INFO("RSA-%zu keygen on 0x%08X (~2-4 s)...\n", static_cast<size_t>(bits), id);
-        ctx.crypto.generateKey(id, bits, policy);
+        ctx.api.generateKey(id, bits, policy);
         LOG_OK("RSA key provisioned\n");
         if (!a.get("--out").empty())
-            ctx.out.spki(a, ctx.crypto.getSpki(id));
+            ctx.out.spki(a, ctx.api.publicKeyDer(id));
         return 0;
     }
 };
@@ -314,7 +312,7 @@ public:
     }
     SessionNeed sessionNeed() const override { return SessionNeed::Crypto; }
     int run(CommandContext &ctx, const Args &a) const override {
-        ctx.out.spki(a, ctx.crypto.getSpki(parseId(a, kRsaKeyId)));
+        ctx.out.spki(a, ctx.api.publicKeyDer(parseId(a, kRsaKeyId)));
         return 0;
     }
 };
@@ -329,7 +327,7 @@ public:
     SessionNeed sessionNeed() const override { return SessionNeed::Crypto; }
     int run(CommandContext &ctx, const Args &a) const override {
         ctx.out.bytes(
-            a, ctx.crypto.sign(parseId(a, kRsaKeyId), OutputWriter::readFile(a.get("--in"))));
+            a, ctx.api.signMessage(parseId(a, kRsaKeyId), OutputWriter::readFile(a.get("--in"))));
         return 0;
     }
 };
@@ -343,8 +341,8 @@ public:
     }
     SessionNeed sessionNeed() const override { return SessionNeed::Crypto; }
     int run(CommandContext &ctx, const Args &a) const override {
-        bool ok = ctx.crypto.verify(parseId(a, kRsaKeyId), OutputWriter::readFile(a.get("--in")),
-                                    OutputWriter::readFile(a.get("--sig")));
+        bool ok = ctx.api.verifyMessage(parseId(a, kRsaKeyId), OutputWriter::readFile(a.get("--in")),
+                                        OutputWriter::readFile(a.get("--sig")));
         ctx.out.line("%s\n", ok ? "VERIFY OK" : "VERIFY FAILED");
         return ok ? 0 : 2;
     }
@@ -362,7 +360,7 @@ public:
         const auto dn = a.get("--subject");
         if (dn.empty())
             throw std::runtime_error("--subject is required");
-        ctx.out.text(a, ctx.crypto.makeCsr(parseId(a, kRsaKeyId), dn));
+        ctx.out.text(a, ctx.api.makeCsr(parseId(a, kRsaKeyId), dn));
         return 0;
     }
 };
@@ -378,7 +376,7 @@ public:
     int run(CommandContext &ctx, const Args &a) const override {
         uint32_t id = parseId(a, kRsaCerId);
         auto der = OutputWriter::readFile(a.get("--in"));
-        se05x::writeCert(ctx.requireMgmt(), id, der);
+        ctx.api.writeCert(id, der);
         LOG_OK("certificate written (id=0x%08X, %zu bytes)\n", id, der.size());
         return 0;
     }
@@ -394,7 +392,6 @@ public:
     }
     SessionNeed sessionNeed() const override { return SessionNeed::Management; }
     int run(CommandContext &ctx, const Args &a) const override {
-        se05x::Session &s = ctx.requireMgmt();
         const uint32_t keyId = parseId(a, kRsaKeyId); // the SE key that signs
 
         std::vector<uint8_t> certDer;
@@ -407,10 +404,10 @@ public:
                                   ? kRsaCerId
                                   : static_cast<uint32_t>(std::strtoul(cidStr.c_str(), nullptr, 0));
             LOG_INFO("reading stored certificate from 0x%08X\n", certId);
-            certDer = se05x::readBinary(s, certId);
+            certDer = ctx.api.readBinary(certId);
         }
 
-        bool ok = se05x::verifyBindingRsa(s, keyId, certDer);
+        bool ok = ctx.api.verifyBinding(keyId, certDer);
         ctx.out.line("%s\n", ok ? "BINDING OK" : "BINDING FAILED");
         return ok ? 0 : 2;
     }

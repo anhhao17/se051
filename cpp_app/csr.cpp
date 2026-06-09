@@ -3,7 +3,7 @@
 // PKCS#10 CSR generation (RSA-2048 / SHA-256) where the private key never
 // leaves the SE05x. mbedTLS assembles the ASN.1; the SE produces the signature.
 
-#include "se05x_crypto.hpp"
+#include "sss.hpp"
 #include "log.hpp"
 
 #include <cstring>

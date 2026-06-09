@@ -37,10 +37,8 @@ if("${PTMW_SE05X_Auth}" STREQUAL "None")
         cli.cpp
         commands.cpp
         output.cpp
-        crypto_backend.cpp
-        se05x_crypto.cpp
-        se05x_object_store.cpp
-        se05x_provision.cpp
+        sss.cpp
+        se05x_api.cpp
         scp03_rotate.cpp
         scp03_keyfile.cpp
         pkcs11_ctx.cpp
@@ -53,10 +51,8 @@ else()
         cli.cpp
         commands.cpp
         output.cpp
-        crypto_backend.cpp
-        se05x_crypto.cpp
-        se05x_object_store.cpp
-        se05x_provision.cpp
+        sss.cpp
+        se05x_api.cpp
         scp03_rotate.cpp
         scp03_keyfile.cpp
         pkcs11_ctx.cpp

@@ -17,19 +17,14 @@
 #include "cli.hpp"
 #include "command.hpp"
 #include "commands.hpp"
-#include "crypto_backend.hpp"
 #include "log.hpp"
 #include "output.hpp"
+#include "se05x_api.hpp" // se05x::Se05xClient
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-
-extern "C" {
-#include <ex_sss_boot.h>
-#include <fsl_sss_api.h>
-}
 
 namespace {
 /** @brief Return the value following @p flag in argv, or nullptr. */
@@ -88,43 +83,18 @@ int main(int argc, char **argv) {
               usePkcs11 ? "PKCS#11"
                         : (need == SessionNeed::Isd ? "SSS/ISD (applet skipped)" : "SSS (applet)"));
 
-    ex_sss_boot_ctx_t ctx{};
-    bool sssOpened = false;
-    std::unique_ptr<se05x::Session> session;
-    std::unique_ptr<ICryptoBackend> backend;
     OutputWriter out;
-
-    if (usePkcs11) {
-        try {
-            backend = std::make_unique<Pkcs11Backend>(pkcs11Lib);
-        } catch (const std::exception &e) {
-            LOG_ERROR("PKCS#11 init failed: %s\n", e.what());
-            return 1;
-        }
-    } else {
-        // Rotation targets the ISD; everything else uses the applet.
-        if (need == SessionNeed::Isd)
-            ctx.se05x_open_ctx.skip_select_applet = 1;
-
-        sss_status_t st = ex_sss_boot_open(&ctx, portName);
-        if (st != kStatus_SSS_Success) {
-            LOG_ERROR("ex_sss_boot_open failed (0x%04x) - set --port or "
-                      "$EX_SSS_BOOT_SSS_PORT\n",
-                      static_cast<unsigned>(st));
-            return 1;
-        }
-        st = ex_sss_key_store_and_object_init(&ctx);
-        if (st != kStatus_SSS_Success) {
-            LOG_ERROR("key store init failed (0x%04x)\n", static_cast<unsigned>(st));
-            ex_sss_session_close(&ctx);
-            return 1;
-        }
-        sssOpened = true;
-        session = std::make_unique<se05x::Session>(&ctx);
-        backend = std::make_unique<SssBackend>(*session);
+    std::unique_ptr<se05x::Se05xClient> client;
+    try {
+        client = usePkcs11 ? se05x::Se05xClient::openPkcs11(pkcs11Lib)
+                           : se05x::Se05xClient::openSss(portName, need != SessionNeed::Isd);
+    } catch (const std::exception &e) {
+        LOG_ERROR("session init failed: %s\n", e.what());
+        return 1;
     }
 
-    CommandContext cctx{*backend, session.get(), out};
+    se05x::Session *isd = (need == SessionNeed::Isd) ? client->sssSession() : nullptr;
+    CommandContext cctx{client->api(), isd, out};
     int rc = 0;
     try {
         rc = cmd->run(cctx, a);
@@ -132,8 +102,5 @@ int main(int argc, char **argv) {
         LOG_ERROR("command '%s %s' failed: %s\n", a.group.c_str(), a.command.c_str(), e.what());
         rc = 1;
     }
-
-    if (sssOpened)
-        ex_sss_session_close(&ctx);
-    return rc;
+    return rc; // SssConnection / Pkcs11Backend close their channels on destruction
 }

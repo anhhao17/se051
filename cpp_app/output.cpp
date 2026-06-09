@@ -6,7 +6,7 @@
 #include "output.hpp"
 #include "command.hpp" // Args
 #include "log.hpp"
-#include "se05x_crypto.hpp" // se05x::spkiToPem
+#include "sss.hpp" // se05x::spkiToPem
 
 #include <cstdarg>
 #include <cstdio>

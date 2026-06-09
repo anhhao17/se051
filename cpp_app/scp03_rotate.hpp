@@ -13,8 +13,9 @@
  */
 
 #pragma once
-#include "se05x_crypto.hpp"
+#include "sss.hpp"
 #include <cstdint>
+#include <memory>
 
 namespace se05x {
 
@@ -59,5 +60,46 @@ struct Scp03KeySet {
  * @throws CryptoError / std::runtime_error on any failure (rotation aborted).
  */
 void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun = false);
+
+/**
+ * @brief One-call Platform SCP03 key rotation over a dedicated ISD session.
+ *
+ * The integration entry point for rotation, parallel to Se05xClient: it owns
+ * the ISD session (applet not selected), runs the rotation, and optionally
+ * persists the new keys - so a service never touches the raw Session or the
+ * key-file format:
+ *
+ *     auto admin = se05x::Scp03Admin::open("/dev/i2c-1:0x48");
+ *     admin->rotate(newKeys, false, "/etc/se05x/scp03.keys");
+ *
+ * @warning IRREVERSIBLE - see rotateScp03().
+ */
+class Scp03Admin {
+public:
+    /**
+     * @brief Open an ISD session (applet not selected) for rotation.
+     * @throws CryptoError if the session fails to open.
+     */
+    static std::unique_ptr<Scp03Admin> open(const char *port);
+
+    /**
+     * @brief Install @p newKeys, optionally persisting them on success.
+     * @param newKeys New ENC/MAC/DEK to install.
+     * @param dryRun  Build/log the PUT KEY APDU but do not send it.
+     * @param keyFile If non-null and not a dry run, write @p newKeys here on
+     *                success (atomic, .bak backup) so the next session can
+     *                authenticate.  Pass nullptr to persist yourself.
+     * @throws CryptoError / std::runtime_error on failure (rotation aborted).
+     */
+    void rotate(const Scp03KeySet &newKeys, bool dryRun, const char *keyFile = nullptr);
+
+    ~Scp03Admin();
+    Scp03Admin(const Scp03Admin &) = delete;
+    Scp03Admin &operator=(const Scp03Admin &) = delete;
+
+private:
+    Scp03Admin() = default;
+    std::unique_ptr<SssConnection> conn_;
+};
 
 } // namespace se05x

@@ -272,4 +272,21 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
            keyVer);
 }
 
+// --- Scp03Admin: one-call rotation entry point ---
+
+std::unique_ptr<Scp03Admin> Scp03Admin::open(const char *port) {
+    std::unique_ptr<Scp03Admin> a(new Scp03Admin());
+    a->conn_ = std::make_unique<SssConnection>(port, /*selectApplet=*/false);
+    return a;
+}
+
+Scp03Admin::~Scp03Admin() = default;
+
+void Scp03Admin::rotate(const Scp03KeySet &newKeys, bool dryRun, const char *keyFile) {
+    rotateScp03(conn_->session(), newKeys, dryRun);
+    if (dryRun || !keyFile)
+        return;
+    Scp03KeyFile::write(keyFile, newKeys); // atomic; backs up to <keyFile>.bak
+}
+
 } // namespace se05x

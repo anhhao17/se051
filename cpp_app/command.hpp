@@ -10,7 +10,7 @@
  */
 
 #pragma once
-#include "crypto_backend.hpp"
+#include "se05x_api.hpp"
 
 #include <map>
 #include <string>
@@ -41,12 +41,12 @@ class OutputWriter; // result/file emission (output.hpp)
 
 /** @brief Everything a command needs to run; assembled by main() after session setup. */
 struct CommandContext {
-    ICryptoBackend &crypto; ///< crypto operations (PKCS#11 or SSS)
-    se05x::Session *mgmt;   ///< non-null for Management / Isd commands
-    OutputWriter &out;      ///< result and file output
+    se05x::Se05x &api;   ///< the unified API (crypto via SSS/PKCS#11 + SSS-only management)
+    se05x::Session *isd; ///< non-null for Isd commands (applet NOT selected; rotation only)
+    OutputWriter &out;   ///< result and file output
 
-    /** @return the management session, or throw if this invocation has none. */
-    se05x::Session &requireMgmt() const;
+    /** @return the raw ISD session, or throw if this invocation has none. */
+    se05x::Session &requireIsd() const;
 };
 
 /** @brief One CLI operation.  Stateless; holds no session or backend. */

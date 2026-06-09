@@ -4,11 +4,14 @@
  */
 
 #include "pkcs11_ctx.hpp"
+#include "log.hpp"
+#include "sss.hpp" // se05x::makeCsrFullSign
 
 #include <array>
 #include <cstdio>
 #include <cstring>
 #include <dlfcn.h>
+#include <stdexcept>
 #include <vector>
 
 extern "C" {
@@ -272,4 +275,55 @@ std::vector<uint8_t> Pkcs11Ctx::getSpki(uint32_t id) {
         throw Pkcs11Error("mbedtls_pk_write_pubkey_der failed");
 
     return std::vector<uint8_t>(buf.end() - n, buf.end());
+}
+
+// --- Pkcs11Backend (crypto layer over Pkcs11Ctx) ---
+
+Pkcs11Backend::Pkcs11Backend(const std::string &libPath) : ctx_(libPath) {}
+
+std::vector<uint8_t> Pkcs11Backend::getRandom(size_t n) {
+    return ctx_.getRandom(n);
+}
+
+bool Pkcs11Backend::keyExists(uint32_t id) {
+    return ctx_.findKey(id, CKO_PRIVATE_KEY) != CK_INVALID_HANDLE;
+}
+
+void Pkcs11Backend::deleteKey(uint32_t id) {
+    ctx_.destroyObject(ctx_.findKey(id, CKO_PRIVATE_KEY));
+    ctx_.destroyObject(ctx_.findKey(id, CKO_PUBLIC_KEY));
+}
+
+void Pkcs11Backend::generateKey(uint32_t id, se05x::RsaBits bits, se05x::KeyPolicy /*policy*/) {
+    LOG_DEBUG("pkcs11: genRsaKeyPair id=0x%08X bits=%lu\n", id, static_cast<unsigned long>(bits));
+    ctx_.genRsaKeyPair(id, static_cast<CK_ULONG>(bits));
+}
+
+std::vector<uint8_t> Pkcs11Backend::getSpki(uint32_t id) {
+    return ctx_.getSpki(id);
+}
+
+std::vector<uint8_t> Pkcs11Backend::sign(uint32_t id, const std::vector<uint8_t> &msg) {
+    auto h = ctx_.findKey(id, CKO_PRIVATE_KEY);
+    if (h == CK_INVALID_HANDLE)
+        throw std::runtime_error("RSA private key not found");
+    return ctx_.signRsa(h, msg);
+}
+
+bool Pkcs11Backend::verify(uint32_t id, const std::vector<uint8_t> &msg,
+                           const std::vector<uint8_t> &sig) {
+    auto h = ctx_.findKey(id, CKO_PUBLIC_KEY);
+    if (h == CK_INVALID_HANDLE)
+        throw std::runtime_error("RSA public key not found");
+    return ctx_.verifyRsa(h, msg, sig);
+}
+
+std::string Pkcs11Backend::makeCsr(uint32_t id, const std::string &subjectDn) {
+    auto spki = ctx_.getSpki(id);
+    auto hPriv = ctx_.findKey(id, CKO_PRIVATE_KEY);
+    if (hPriv == CK_INVALID_HANDLE)
+        throw std::runtime_error("RSA private key not found");
+    return se05x::makeCsrFullSign(subjectDn, spki, [this, hPriv](const std::vector<uint8_t> &cri) {
+        return ctx_.signRsa(hPriv, cri);
+    });
 }

@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include "crypto.hpp"
+
 #include <array>
 #include <cstdint>
 #include <stdexcept>
@@ -192,4 +194,31 @@ private:
     void *lib_ = nullptr;
     CK_FUNCTION_LIST_PTR p11_ = nullptr;
     CK_SESSION_HANDLE hSess_ = CK_INVALID_HANDLE;
+};
+
+/**
+ * @brief PKCS#11 backend - all operations through @c libsss_pkcs11.so.
+ *
+ * Implements the crypto layer (ICryptoBackend) over a Pkcs11Ctx.  Management
+ * operations (uid / cert / binding) are not available on this path - they are
+ * SSS-only (see SssBackend).
+ */
+class Pkcs11Backend final : public ICryptoBackend {
+public:
+    /** @param libPath Full path to @c libsss_pkcs11.so. */
+    explicit Pkcs11Backend(const std::string &libPath);
+
+    std::vector<uint8_t> getRandom(size_t n) override;
+    bool keyExists(uint32_t id) override;
+    void deleteKey(uint32_t id) override;
+    void generateKey(uint32_t id, se05x::RsaBits bits,
+                     se05x::KeyPolicy policy = se05x::KeyPolicy::Full) override;
+    std::vector<uint8_t> getSpki(uint32_t id) override;
+    std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
+    bool verify(uint32_t id, const std::vector<uint8_t> &msg,
+                const std::vector<uint8_t> &sig) override;
+    std::string makeCsr(uint32_t id, const std::string &subjectDn) override;
+
+private:
+    Pkcs11Ctx ctx_;
 };
