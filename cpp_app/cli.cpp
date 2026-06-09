@@ -12,12 +12,17 @@
 
 #include "cli.hpp"
 #include "log.hpp"
+#include "scp03_rotate.hpp"
 #include "se05x_provision.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <stdexcept>
+
+#include <array>
+#include <cstring>
+#include <string>
 
 Cli::Cli(ICryptoBackend &crypto, se05x::Session *mgmt) : crypto_(crypto), mgmt_(mgmt) {}
 
@@ -82,6 +87,8 @@ void Cli::usage(const char *prog) {
         "Commands:\n"
         "  rng <nbytes>\n"
         "  se  uid\n"
+        "  se  rotate-scp03   --enc <hex32> --mac <hex32> --dek <hex32>\n"
+        "                     [--dry-run] [--confirm]   (SSS only, IRREVERSIBLE)\n"
         "  rsa genkey         [--id <hex>=0xFE000001] [--bits 2048|3072|4096] [--force]\n"
         "                     [--policy full|sign-only|sign-decrypt] [--out <file>]\n"
         "  rsa pub            [--id <hex>=0xFE000001] [--out <file>] [--pem]\n"
@@ -171,6 +178,36 @@ int Cli::doSe(const Args &a) {
         auto uid = se05x::readUid(mgmt());
         Log::get().print("UID (%zu bytes): ", uid.size());
         Log::get().hex(uid);
+        return 0;
+    }
+    if (a.command == "rotate-scp03") {
+        // Parse a 32-hex-char (16-byte) key option.
+        const auto key16 = [&](const char *opt) {
+            std::string h = a.get(opt);
+            if (h.size() != 32)
+                throw std::runtime_error(std::string(opt) + " must be 32 hex chars (16 bytes)");
+            std::array<uint8_t, 16> out{};
+            for (int i = 0; i < 16; ++i) {
+                unsigned b = 0;
+                if (std::sscanf(h.c_str() + i * 2, "%02x", &b) != 1)
+                    throw std::runtime_error(std::string("invalid hex in ") + opt);
+                out[i] = static_cast<uint8_t>(b);
+            }
+            return out;
+        };
+
+        bool dryRun = a.flag("--dry-run");
+        if (!dryRun && !a.flag("--confirm"))
+            throw std::runtime_error(
+                "rotate-scp03 is IRREVERSIBLE; add --confirm to execute, or --dry-run to preview");
+
+        se05x::Scp03KeySet keys{};
+        auto enc = key16("--enc"), mac = key16("--mac"), dek = key16("--dek");
+        std::memcpy(keys.enc, enc.data(), 16);
+        std::memcpy(keys.mac, mac.data(), 16);
+        std::memcpy(keys.dek, dek.data(), 16);
+
+        se05x::rotateScp03(mgmt(), keys, dryRun);
         return 0;
     }
     throw std::runtime_error("unknown se command: " + a.command);

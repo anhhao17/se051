@@ -102,6 +102,12 @@ int main(int argc, char **argv) {
     auto pre       = preParse(argc, argv);
     bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
 
+    // PlatformSCP03 key rotation targets the ISD, not the SE05x applet.  Open
+    // the session with applet selection skipped (mirrors the NXP demo's
+    // EX_SSS_BOOT_SKIP_SELECT_APPLET=1); otherwise PUT KEY is parsed in the
+    // applet context and the card rejects it (e.g. SW 0x6A80 / 0x6985).
+    const bool isIsdCommand = (pre.group == "se" && pre.command == "rotate-scp03");
+
     ex_sss_boot_ctx_t               ctx{};
     bool                            sssOpened = false;
     std::unique_ptr<se05x::Session> session;
@@ -115,6 +121,8 @@ int main(int argc, char **argv) {
             return 1;
         }
     } else {
+        if (isIsdCommand) ctx.se05x_open_ctx.skip_select_applet = 1;
+
         sss_status_t st = ex_sss_boot_open(&ctx, portName);
         if (st != kStatus_SSS_Success) {
             LOG_ERROR("ex_sss_boot_open failed (0x%04x) - set --port or "
@@ -122,6 +130,11 @@ int main(int argc, char **argv) {
                       static_cast<unsigned>(st));
             return 1;
         }
+        // Run on every path, including the ISD/rotate path: this is what the
+        // NXP demo does (ex_sss_main_inc.h calls it unconditionally even with
+        // skip_select_applet=1).  With the applet skipped it does ISD-only
+        // setup and does NOT select the applet; skipping it leaves the SCP03
+        // security level unset and PUT KEY is rejected with SW 0x6982.
         st = ex_sss_key_store_and_object_init(&ctx);
         if (st != kStatus_SSS_Success) {
             LOG_ERROR("key store init failed (0x%04x)\n", static_cast<unsigned>(st));
