@@ -7,7 +7,7 @@ set(MBEDTLS_PREFIX ${CMAKE_BINARY_DIR}/mbedtls)
 set(BUILD_JOBS 2 CACHE STRING "Parallel build jobs for ExternalProject steps")
 
 option(SE05X_DEBUG_LOG "Enable Plug & Trust debug logging" OFF)
-option(SE05X_STRIP    "Strip installed binaries"           OFF)
+option(SE05X_STRIP    "Strip installed binaries"           ON)
 set(SE05X_STAGE_DIR ${CMAKE_BINARY_DIR}/stage)
 set(_mbedtls_user_cfg "${CMAKE_BINARY_DIR}/mbedtls_user_config.h")
 file(WRITE "${_mbedtls_user_cfg}"
@@ -26,10 +26,6 @@ else()
     set(TOOLCHAIN_ARG "")
 endif()
 
-# Args common to all three P&T sub-builds (app, cpp_app, pkcs11_lib).
-# CMAKE_INSTALL_PREFIX points to the staging tree so INSTALL_COMMAND always
-# writes into the build directory — no host permission issues, no DESTDIR needed
-# at build time.
 if(SE05X_STRIP)
     set(_strip_arg "--strip")
 else()
@@ -46,6 +42,11 @@ set(PTMW_COMMON_ARGS
     -DMBEDTLS_USER_CONFIG_FILE=${_mbedtls_user_cfg}
     -DSE05X_DEBUG_LOG=${SE05X_DEBUG_LOG}
     -DCMAKE_INSTALL_PREFIX=${SE05X_STAGE_DIR}
+    -DCMAKE_BUILD_TYPE=Release
+    "-DCMAKE_C_FLAGS_RELEASE=-Os -DNDEBUG -ffunction-sections -fdata-sections"
+    "-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -ffunction-sections -fdata-sections"
+    "-DCMAKE_EXE_LINKER_FLAGS=-Wl,--gc-sections"
+    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--gc-sections"
 )
 
 ExternalProject_Add(mbedtls
@@ -60,6 +61,9 @@ ExternalProject_Add(mbedtls
         -DENABLE_PROGRAMS=OFF
         -DENABLE_TESTING=OFF
         -DMBEDTLS_USER_CONFIG_FILE=${_mbedtls_user_cfg}
+        # Per-function/data sections so the app's -Wl,--gc-sections can drop
+        # unreferenced mbedTLS code from the static archives.
+        "-DCMAKE_C_FLAGS=-ffunction-sections -fdata-sections"
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --parallel ${BUILD_JOBS}
 )
 

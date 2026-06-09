@@ -25,10 +25,6 @@ std::vector<uint8_t> sha256(const std::vector<uint8_t> &in) {
 
 } // namespace
 
-// ---------------------------------------------------------------------------
-// Pkcs11Backend
-// ---------------------------------------------------------------------------
-
 Pkcs11Backend::Pkcs11Backend(const std::string &libPath) : ctx_(libPath) {}
 
 std::vector<uint8_t> Pkcs11Backend::getRandom(size_t n) {
@@ -97,10 +93,6 @@ std::string Pkcs11Backend::makeCsr(uint32_t id, const std::string &subjectDn) {
             return ctx_.signRsa(hPriv, cri);
         });
 }
-
-// ---------------------------------------------------------------------------
-// SssBackend
-// ---------------------------------------------------------------------------
 
 SssBackend::SssBackend(se05x::Session &session) : session_(session) {}
 

@@ -93,10 +93,6 @@ int main(int argc, char **argv) {
     auto pre       = preParse(argc, argv);
     bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
 
-    // ------------------------------------------------------------------
-    // Open the appropriate backend (never both — SCP03 channel conflict).
-    // ------------------------------------------------------------------
-
     ex_sss_boot_ctx_t ctx{};
     bool sssOpened = false;
     std::unique_ptr<se05x::Session>   session;

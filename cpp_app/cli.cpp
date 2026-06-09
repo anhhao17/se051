@@ -138,10 +138,6 @@ se05x::RsaBits Cli::parseBits(const std::string &s) {
     throw std::runtime_error("unknown RSA size: " + s);
 }
 
-// ---------------------------------------------------------------------------
-// Command handlers
-// ---------------------------------------------------------------------------
-
 int Cli::doRng(const Args &a) {
     if (a.positional.empty()) throw std::runtime_error("usage: rng <nbytes>");
     size_t n = std::strtoul(a.positional.c_str(), nullptr, 0);
