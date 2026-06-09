@@ -93,8 +93,6 @@ public:
     sss_session_t      *session()  { return &ctx_->session; }
     /** @return SSS key store pointer for key object operations. */
     sss_key_store_t    *keystore() { return &ctx_->ks; }
-    /** @return Raw boot context (needed for SE-specific APDU calls). */
-    ex_sss_boot_ctx_t  *raw()      { return ctx_; }
 
 private:
     ex_sss_boot_ctx_t *ctx_;

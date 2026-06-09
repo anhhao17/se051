@@ -2,8 +2,6 @@
 #include "se05x_crypto.hpp"
 
 #include <cstdio>
-#include <sstream>
-#include <stdexcept>
 
 namespace se05x {
 
