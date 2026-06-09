@@ -42,14 +42,11 @@ a native host build.
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=armhf-toolchain.cmake
 cmake --build build              # builds mbedTLS, then pkcs11_lib + cpp_app
 
-# aarch64 cross-compile
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=aarch64-toolchain.cmake
-
 # native host (development)
 cmake -S . -B build
 ```
 
-Toolchain files (`armhf-toolchain.cmake`, `aarch64-toolchain.cmake`) point `TOOLCHAIN_ROOT` at a
+Toolchain files (`armhf-toolchain.cmake`) point `TOOLCHAIN_ROOT` at a
 cross GCC + sysroot; edit that path to match your install.
 
 **Build options:**

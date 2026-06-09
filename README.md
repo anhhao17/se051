@@ -80,20 +80,23 @@ git submodule update --init --recursive
 | Target | Toolchain file |
 |---|---|
 | armhf (32-bit ARM hard-float) | `armhf-toolchain.cmake` |
-| aarch64 (64-bit ARM) | `aarch64-toolchain.cmake` |
 
-The toolchain files point at the cross GCC and its sysroot; edit `TOOLCHAIN_ROOT` to match
-your install.
+The toolchain files point at the cross GCC and its sysroot. Rather than editing the file,
+override the armhf toolchain root via either an env var or a CMake arg (both reach the
+sub-builds; an explicit `-D` wins over the env var, which wins over the file's default):
+
+```bash
+export TOOLCHAIN_ROOT=/opt/my-armhf-gcc
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=armhf-toolchain.cmake
+# or:
+cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=armhf-toolchain.cmake -DTOOLCHAIN_ROOT=/opt/my-armhf-gcc
+```
 
 ## Build
 
 ```bash
 # armhf (32-bit ARM hard-float)
 cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=armhf-toolchain.cmake
-cmake --build build
-
-# aarch64 (64-bit ARM)
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=aarch64-toolchain.cmake
 cmake --build build
 
 # Native host build (x86_64, for development)
@@ -127,7 +130,6 @@ caching will not otherwise detect the source change.
 .
 ├── CMakeLists.txt           # Superbuild - mbedTLS → pkcs11_lib → cpp_app
 ├── armhf-toolchain.cmake    # Cross-toolchain for 32-bit ARM hard-float
-├── aarch64-toolchain.cmake  # Cross-toolchain for 64-bit ARM
 ├── cpp_app/                 # se05x_crypto_app - RSA provisioning CLI
 │   ├── main.cpp             # Backend selection + session lifecycle (by SessionNeed)
 │   ├── cli.cpp/.hpp         # Arg parsing (parseArgs → Args)

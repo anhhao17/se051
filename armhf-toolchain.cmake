@@ -1,8 +1,11 @@
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR arm)
 
-# Root of the toolchain (use $ENV{HOME} instead of ~)
-set(TOOLCHAIN_ROOT $ENV{HOME}/work/iritech26tpro/tools/gcc-11.1.0-20210608-sigmastar-glibc-x86_64_arm-linux-gnueabihf)
+if(NOT TOOLCHAIN_ROOT)
+    if(DEFINED ENV{TOOLCHAIN_ROOT})
+        set(TOOLCHAIN_ROOT $ENV{TOOLCHAIN_ROOT})
+    endif()
+endif()
 
 # The cross prefix used by all the tools
 set(TOOLCHAIN_PREFIX arm-linux-gnueabihf-)

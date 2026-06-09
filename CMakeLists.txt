@@ -7,7 +7,7 @@ set(MBEDTLS_PREFIX ${CMAKE_BINARY_DIR}/mbedtls)
 set(BUILD_JOBS 2 CACHE STRING "Parallel build jobs for ExternalProject steps")
 
 option(SE05X_DEBUG_LOG "Enable Plug & Trust debug logging" OFF)
-option(SE05X_STRIP    "Strip installed binaries"           ON)
+option(SE05X_STRIP    "Strip installed binaries"           OFF)
 set(SE05X_STAGE_DIR ${CMAKE_BINARY_DIR}/stage)
 set(_mbedtls_user_cfg "${CMAKE_BINARY_DIR}/mbedtls_user_config.h")
 file(WRITE "${_mbedtls_user_cfg}"
@@ -18,12 +18,17 @@ file(WRITE "${_mbedtls_user_cfg}"
 )
 
 # Forward the toolchain to every sub-build when cross-compiling.
+set(TOOLCHAIN_ARG "")
 if(CMAKE_TOOLCHAIN_FILE)
     get_filename_component(_toolchain_abs "${CMAKE_TOOLCHAIN_FILE}" ABSOLUTE
                            BASE_DIR "${CMAKE_SOURCE_DIR}")
-    set(TOOLCHAIN_ARG "-DCMAKE_TOOLCHAIN_FILE=${_toolchain_abs}")
-else()
-    set(TOOLCHAIN_ARG "")
+    list(APPEND TOOLCHAIN_ARG "-DCMAKE_TOOLCHAIN_FILE=${_toolchain_abs}")
+    # The toolchain file resolves TOOLCHAIN_ROOT (from -D, env, or its default);
+    # forward the resolved value so a -DTOOLCHAIN_ROOT=... also reaches the
+    # sub-builds (a TOOLCHAIN_ROOT env var is inherited and needs no forwarding).
+    if(TOOLCHAIN_ROOT)
+        list(APPEND TOOLCHAIN_ARG "-DTOOLCHAIN_ROOT=${TOOLCHAIN_ROOT}")
+    endif()
 endif()
 
 if(SE05X_STRIP)
