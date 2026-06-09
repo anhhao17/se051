@@ -16,13 +16,6 @@ void check(sss_status_t st, const char *where) {
         throw CryptoError(std::string("SSS call failed: ") + where, st);
 }
 
-void eraseKey(Session &s, uint32_t keyId) {
-    sss_object_t obj{};
-    check(sss_key_object_init(&obj, s.keystore()), "key_object_init(erase)");
-    check(sss_key_object_get_handle(&obj, keyId), "key_object_get_handle(erase)");
-    check(sss_key_store_erase_key(s.keystore(), &obj), "key_store_erase_key");
-}
-
 namespace {
 void openHandle(Session &s, sss_object_t *obj, uint32_t keyId) {
     check(sss_key_object_init(obj, s.keystore()), "key_object_init");

@@ -39,6 +39,7 @@ if("${PTMW_SE05X_Auth}" STREQUAL "None")
         output.cpp
         crypto_backend.cpp
         se05x_crypto.cpp
+        se05x_object_store.cpp
         se05x_provision.cpp
         scp03_rotate.cpp
         scp03_keyfile.cpp
@@ -54,6 +55,7 @@ else()
         output.cpp
         crypto_backend.cpp
         se05x_crypto.cpp
+        se05x_object_store.cpp
         se05x_provision.cpp
         scp03_rotate.cpp
         scp03_keyfile.cpp

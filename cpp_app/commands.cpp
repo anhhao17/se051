@@ -15,6 +15,7 @@
 #include "scp03_keyfile.hpp"
 #include "scp03_rotate.hpp"
 #include "se05x_crypto.hpp"
+#include "se05x_object_store.hpp"
 #include "se05x_provision.hpp"
 #include "keys.hpp"
 

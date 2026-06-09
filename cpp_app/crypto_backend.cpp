@@ -9,6 +9,7 @@
 
 #include "crypto_backend.hpp"
 #include "log.hpp"
+#include "se05x_object_store.hpp"
 #include "se05x_provision.hpp"
 
 extern "C" {
@@ -86,7 +87,7 @@ bool SssBackend::keyExists(uint32_t id) {
 
 void SssBackend::deleteKey(uint32_t id) {
     if (se05x::objectExists(session_, id))
-        se05x::eraseKey(session_, id);
+        se05x::eraseObject(session_, id);
 }
 
 void SssBackend::generateKey(uint32_t id, se05x::RsaBits bits, se05x::KeyPolicy policy) {

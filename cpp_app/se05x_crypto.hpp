@@ -62,16 +62,6 @@ enum class RsaBits { Rsa2048 = 2048, Rsa3072 = 3072, Rsa4096 = 4096 };
 void check(sss_status_t st, const char *where);
 
 /**
- * @brief Erase a persisted key object from the SE.
- *
- * Throws CryptoError if the object does not exist.
- *
- * @param s     Active session.
- * @param keyId SE object ID to erase.
- */
-void eraseKey(class Session &s, uint32_t keyId);
-
-/**
  * @brief RAII borrower of an already-opened SSS boot context.
  *
  * The boot framework (ex_sss_boot_open / ex_sss_session_close) owns the
@@ -121,7 +111,8 @@ std::vector<uint8_t> getRandom(Session &s, size_t numBytes);
  * policies, or certificate storage - those belong to other classes.
  *
  * Key objects are persistent on the SE.  The destructor does NOT erase the
- * key from SE storage; use eraseKey() or the @c --force flag for that.
+ * key from SE storage; use se05x::eraseObject() (se05x_object_store.hpp) or
+ * the @c --force flag for that.
  *
  * Move-only (not copyable) to express sole ownership of the in-memory
  * sss_object_t handle.
