@@ -18,7 +18,6 @@
 #include "crypto_backend.hpp"
 #include "log.hpp"
 
-
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -41,7 +40,9 @@ const char *argValue(int argc, char **argv, const char *flag) {
     return nullptr;
 }
 
-struct PreParsed { std::string group, command; };
+struct PreParsed {
+    std::string group, command;
+};
 
 /** @brief Extract the first two positional tokens (group and command). */
 PreParsed preParse(int argc, char **argv) {
@@ -51,8 +52,12 @@ PreParsed preParse(int argc, char **argv) {
         if (t.rfind("--", 0) == 0) {
             if (t != "--force" && i + 1 < argc) ++i;
         } else {
-            if (r.group.empty())        r.group   = t;
-            else if (r.command.empty()) { r.command = t; break; }
+            if (r.group.empty())
+                r.group = t;
+            else if (r.command.empty()) {
+                r.command = t;
+                break;
+            }
         }
     }
     return r;
@@ -65,10 +70,8 @@ PreParsed preParse(int argc, char **argv) {
 bool isPkcs11Command(const std::string &group, const std::string &cmd) {
     if (group == "rng") return true;
     if (group != "rsa") return false;
-    static const std::array<const char *, 8> cmds = {{
-        "genkey", "provision", "sign", "verify",
-        "encrypt", "decrypt", "csr", "pub"
-    }};
+    static const std::array<const char *, 8> cmds = {
+        {"genkey", "provision", "sign", "verify", "encrypt", "decrypt", "csr", "pub"}};
     for (const char *c : cmds)
         if (cmd == c) return true;
     return false;
@@ -77,11 +80,17 @@ bool isPkcs11Command(const std::string &group, const std::string &cmd) {
 } // namespace
 
 int main(int argc, char **argv) {
-    if (argc < 2) { Cli::usage(argv[0]); return 1; }
+    if (argc < 2) {
+        Cli::usage(argv[0]);
+        return 1;
+    }
 
-    const char *logPath   = argValue(argc, argv, "--log");
-    try { Log::init(logPath); } catch (const std::exception &e) {
-        std::fprintf(stderr, "[!] %s\n", e.what()); return 1;
+    const char *logPath = argValue(argc, argv, "--log");
+    try {
+        Log::init(logPath);
+    } catch (const std::exception &e) {
+        std::fprintf(stderr, "[!] %s\n", e.what());
+        return 1;
     }
 
     const char *portEnv  = std::getenv("EX_SSS_BOOT_SSS_PORT");
@@ -93,10 +102,10 @@ int main(int argc, char **argv) {
     auto pre       = preParse(argc, argv);
     bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
 
-    ex_sss_boot_ctx_t ctx{};
-    bool sssOpened = false;
-    std::unique_ptr<se05x::Session>   session;
-    std::unique_ptr<ICryptoBackend>   backend;
+    ex_sss_boot_ctx_t               ctx{};
+    bool                            sssOpened = false;
+    std::unique_ptr<se05x::Session> session;
+    std::unique_ptr<ICryptoBackend> backend;
 
     if (usePkcs11) {
         try {
@@ -115,8 +124,7 @@ int main(int argc, char **argv) {
         }
         st = ex_sss_key_store_and_object_init(&ctx);
         if (st != kStatus_SSS_Success) {
-            LOG_ERROR("key store init failed (0x%04x)\n",
-                      static_cast<unsigned>(st));
+            LOG_ERROR("key store init failed (0x%04x)\n", static_cast<unsigned>(st));
             ex_sss_session_close(&ctx);
             return 1;
         }

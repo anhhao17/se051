@@ -79,7 +79,6 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der);
  * @return         true if the SE key and certificate public key match.
  * @throws std::runtime_error if @p certDer cannot be parsed.
  */
-bool verifyBindingRsa(Session &s, uint32_t keyId,
-                      const std::vector<uint8_t> &certDer);
+bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &certDer);
 
 } // namespace se05x

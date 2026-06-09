@@ -40,17 +40,15 @@ public:
      * @param what  Human-readable description of the failure.
      * @param st    The SSS status code (default: generic failure).
      */
-    explicit CryptoError(const std::string &what,
-                         sss_status_t st = kStatus_SSS_Fail)
-        : std::runtime_error(what + " (sss_status=0x" + hex(st) + ")"),
-          status_(st) {}
+    explicit CryptoError(const std::string &what, sss_status_t st = kStatus_SSS_Fail)
+        : std::runtime_error(what + " (sss_status=0x" + hex(st) + ")"), status_(st) {}
 
     /** @return The raw SSS status code. */
     sss_status_t status() const { return status_; }
 
 private:
     static std::string hex(sss_status_t st);
-    sss_status_t status_;
+    sss_status_t       status_;
 };
 
 /** @brief RSA key size in bits. */
@@ -90,9 +88,9 @@ public:
     explicit Session(ex_sss_boot_ctx_t *ctx) : ctx_(ctx) {}
 
     /** @return SSS session pointer for asymmetric / RNG contexts. */
-    sss_session_t      *session()  { return &ctx_->session; }
+    sss_session_t *session() { return &ctx_->session; }
     /** @return SSS key store pointer for key object operations. */
-    sss_key_store_t    *keystore() { return &ctx_->ks; }
+    sss_key_store_t *keystore() { return &ctx_->ks; }
 
 private:
     ex_sss_boot_ctx_t *ctx_;
@@ -189,8 +187,8 @@ public:
 
     ~RsaKey();
     RsaKey(RsaKey &&) noexcept;
-    RsaKey &operator=(RsaKey &&) = delete;
-    RsaKey(const RsaKey &) = delete;
+    RsaKey &operator=(RsaKey &&)      = delete;
+    RsaKey(const RsaKey &)            = delete;
     RsaKey &operator=(const RsaKey &) = delete;
 
 private:
@@ -198,7 +196,7 @@ private:
     Session     &s_;
     sss_object_t obj_{};
     size_t       bits_ = 2048;
-    bool         owns_ = false;  ///< false when opened (not generated) - no erase on close
+    bool         owns_ = false; ///< false when opened (not generated) - no erase on close
 };
 
 /**
@@ -214,10 +212,9 @@ private:
  * @return          PEM CSR.
  * @throws CryptoError on ASN.1 assembly failure.
  */
-std::string makeCsrFullSign(
-    const std::string &subjectDn,
-    const std::vector<uint8_t> &spki,
-    std::function<std::vector<uint8_t>(const std::vector<uint8_t>&)> sign);
+std::string
+makeCsrFullSign(const std::string &subjectDn, const std::vector<uint8_t> &spki,
+                std::function<std::vector<uint8_t>(const std::vector<uint8_t> &)> sign);
 
 /**
  * @brief Convert a DER SubjectPublicKeyInfo to PEM.
