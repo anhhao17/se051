@@ -63,19 +63,7 @@ bool Pkcs11Backend::verify(uint32_t id, const std::vector<uint8_t> &msg,
     return ctx_.verifyRsa(h, msg, sig);
 }
 
-std::vector<uint8_t> Pkcs11Backend::encrypt(uint32_t                    id,
-                                            const std::vector<uint8_t> &plain) {
-    auto h = ctx_.findKey(id, CKO_PUBLIC_KEY);
-    if (h == CK_INVALID_HANDLE) throw std::runtime_error("RSA public key not found");
-    return ctx_.encryptRsa(h, plain);
-}
 
-std::vector<uint8_t> Pkcs11Backend::decrypt(uint32_t                    id,
-                                            const std::vector<uint8_t> &cipher) {
-    auto h = ctx_.findKey(id, CKO_PRIVATE_KEY);
-    if (h == CK_INVALID_HANDLE) throw std::runtime_error("RSA private key not found");
-    return ctx_.decryptRsa(h, cipher);
-}
 
 std::string Pkcs11Backend::makeCsr(uint32_t id, const std::string &subjectDn) {
     auto spki  = ctx_.getSpki(id);
@@ -120,14 +108,7 @@ bool SssBackend::verify(uint32_t id, const std::vector<uint8_t> &msg,
     return se05x::RsaKey::open(session_, id).verify(sha256(msg), sig);
 }
 
-std::vector<uint8_t> SssBackend::encrypt(uint32_t id, const std::vector<uint8_t> &plain) {
-    return se05x::RsaKey::open(session_, id).encrypt(plain);
-}
 
-std::vector<uint8_t> SssBackend::decrypt(uint32_t                    id,
-                                         const std::vector<uint8_t> &cipher) {
-    return se05x::RsaKey::open(session_, id).decrypt(cipher);
-}
 
 std::string SssBackend::makeCsr(uint32_t id, const std::string &subjectDn) {
     return se05x::RsaKey::open(session_, id).makeCsr(subjectDn);

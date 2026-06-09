@@ -35,10 +35,13 @@ if("${PTMW_SE05X_Auth}" STREQUAL "None")
         ${SIMW_SE_SOURCES}
         main.cpp
         cli.cpp
+        commands.cpp
+        output.cpp
         crypto_backend.cpp
         se05x_crypto.cpp
         se05x_provision.cpp
         scp03_rotate.cpp
+        scp03_keyfile.cpp
         pkcs11_ctx.cpp
         csr.cpp)
 else()
@@ -47,10 +50,13 @@ else()
         ${SIMW_SE_AUTH_SOURCES}
         main.cpp
         cli.cpp
+        commands.cpp
+        output.cpp
         crypto_backend.cpp
         se05x_crypto.cpp
         se05x_provision.cpp
         scp03_rotate.cpp
+        scp03_keyfile.cpp
         pkcs11_ctx.cpp
         csr.cpp)
 endif()

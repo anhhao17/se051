@@ -35,8 +35,8 @@ flowchart LR
         MW --> MBED
     end
     subgraph SE["SE05x (SE051)"]
-        KEY["RSA-2048 key<br/>0xF0000001"]
-        CERT["leaf cert<br/>0xF0000002"]
+        KEY["RSA-2048 key<br/>0xFE000001"]
+        CERT["leaf cert<br/>0xFE000002"]
     end
     MW -- "SCP03 over T=1 / I2C" --> SE
 
@@ -52,8 +52,8 @@ Exactly two objects. The private key never leaves the chip.
 
 | Object ID    | Type             | Contents                  | Policy after provisioning |
 |--------------|------------------|---------------------------|---------------------------|
-| `0xF0000001` | RSA-2048 keypair | device identity key       | sign/decrypt only, non-exportable, SCP03-required |
-| `0xF0000002` | Binary file      | device leaf cert (DER)    | read allowed, write-locked |
+| `0xFE000001` | RSA-2048 keypair | device identity key       | sign/decrypt only, non-exportable, SCP03-required |
+| `0xFE000002` | Binary file      | device leaf cert (DER)    | read allowed, write-locked |
 
 ---
 
@@ -74,10 +74,10 @@ verifies it. The device stores no chain.
 |-------|------|-------|
 | 0 | Read SE UID; record it as the device anchor | Host ↔ SE |
 | 1 | Open SCP03; rotate keys off defaults to `KDF(master, UID)` | Host ↔ SE ↔ HSM |
-| 2 | Generate RSA-2048 CRT keypair → `0xF0000001` **(slow)** | SE |
+| 2 | Generate RSA-2048 CRT keypair → `0xFE000001` **(slow)** | SE |
 | 3 | Build CSR; SE signs the CRI; embed UID in subject | Host ↔ SE |
 | 4 | Send CSR to CA hub over mutual TLS; receive leaf cert | Host ↔ CA |
-| 5 | Write cert → `0xF0000002`; verify key↔cert binding | Host ↔ SE |
+| 5 | Write cert → `0xFE000002`; verify key↔cert binding | Host ↔ SE |
 | 6 | Lock object policies | Host ↔ SE |
 | 7 | End-of-line attestation (TLS/sign self-test); log | Host ↔ SE ↔ DB |
 
@@ -108,7 +108,7 @@ sequenceDiagram
     H->>SE: open SCP03 (incoming) + rotate
 
     Note over H,DB: Phase 2 - RSA-2048 keygen (slow)
-    H->>SE: genkey CRT -> 0xF0000001
+    H->>SE: genkey CRT -> 0xFE000001
     SE-->>H: public key
 
     Note over H,DB: Phase 3 - CSR (UID in subject)
@@ -121,7 +121,7 @@ sequenceDiagram
     CA-->>H: leaf cert (DER)
 
     Note over H,DB: Phase 5 - write cert + verify binding
-    H->>SE: write cert -> 0xF0000002
+    H->>SE: write cert -> 0xFE000002
     H->>SE: sign random nonce
     SE-->>H: signature
     Note over H: verify with cert pubkey<br/>reject unit on mismatch
@@ -170,11 +170,11 @@ per unit. Engineer around it:
 | Phase | Command | Status |
 |-------|---------|--------|
 | 0 | `se uid` | **done** |
-| 2 | `rsa genkey --id 0xF0000001 --bits 2048 [--force]` | **done** - idempotent; reuses existing key unless `--force` |
-| 3 | `rsa csr --id 0xF0000001 --subject "CN=...,serialNumber=<UID>"` | **done** - `sha256WithRSAEncryption` PKCS#1 v1.5 |
-| 5 | `rsa write-cert --id 0xF0000002 --in leaf.der` | **done** - SSS-only; idempotent erase-then-write |
-| 5 | `rsa verify-binding --id 0xF0000001 --cert leaf.der` | **done** - TRNG nonce → SE sign → mbedTLS verify |
-| 6 | `rsa genkey --id 0xF0000001 --policy sign-decrypt` (policy set at creation time) | **done** — set via `--policy` flag on `rsa genkey` |
+| 2 | `rsa genkey --id 0xFE000001 --bits 2048 [--force]` | **done** - idempotent; reuses existing key unless `--force` |
+| 3 | `rsa csr --id 0xFE000001 --subject "CN=...,serialNumber=<UID>"` | **done** - `sha256WithRSAEncryption` PKCS#1 v1.5 |
+| 5 | `rsa write-cert --id 0xFE000002 --in leaf.der` | **done** - SSS-only; idempotent erase-then-write |
+| 5 | `rsa verify-binding --id 0xFE000001 --cert leaf.der` | **done** - TRNG nonce → SE sign → mbedTLS verify |
+| 6 | `rsa genkey --id 0xFE000001 --policy sign-decrypt` (policy set at creation time) | **done** — set via `--policy` flag on `rsa genkey` |
 | 1 | `rotate-scp03` (KDF from UID) | **not yet** - irreversible, handle carefully |
 
 Standard crypto (genkey, sign, verify, encrypt, decrypt, csr, rng) is routed
@@ -183,7 +183,7 @@ through PKCS#11 when `--pkcs11 <lib>` is given.  Management commands
 path and do not accept `--pkcs11`.
 
 Default key ID in the CLI is `0xFE000001` (demo/test range).  Explicitly pass
-`--id 0xF0000001` / `--id 0xF0000002` for production objects.
+`--id 0xFE000001` / `--id 0xFE000002` for production objects.
 
 Output goes to stdout by default; `--log <file>` redirects result output to a
 file while status lines continue to stderr.
@@ -193,7 +193,7 @@ file while status lines continue to stderr.
 ## 8. Open decisions
 
 1. Device key **sign-only**, or also **decrypt/key-transport** for TLS?
-   (Sets the decrypt policy bit on `0xF0000001`.)
+   (Sets the decrypt policy bit on `0xFE000001`.)
 2. SCP03 keys **per-device** (UID-KDF, recommended) or **per-batch**?
 3. Is the RSA key **non-deletable** for the product's life?
 4. Do you advance the applet out of pre-perso during provisioning?
@@ -244,7 +244,7 @@ In this build the static keys are read from a file
 ## SE05x non-volatile memory
 
 Persistent secure objects in this design: the RSA-2048 identity key
-(`0xF0000001`) and the leaf certificate (`0xF0000002`). They survive reset and
+(`0xFE000001`) and the leaf certificate (`0xFE000002`). They survive reset and
 power cycles; transient objects (e.g. an ECDH peer key) do not.
 
 > **Warning** - erasing/initializing the SE NVM deletes all keys and
@@ -258,7 +258,7 @@ stacks (OpenSSL, the OTA client's device auth key, etc.) can use the device
 key without ever seeing the private material.
 
 > **Note** - the PKCS#11 "private key" is only a **handle** to the key in SE
-> NVM; the private key is never exported. The leaf certificate (`0xF0000002`)
+> NVM; the private key is never exported. The leaf certificate (`0xFE000002`)
 > is read out in DER and imported into the token alongside the handle.
 
 This is how the on-chip identity key plugs into outbound mutual-TLS (e.g.
@@ -282,8 +282,8 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
   rsa    csr    [--id <hex>] --subject "CN=..."
 
   Provisioning (SSS-only, no --pkcs11):
-  rsa    write-cert      --id 0xF0000002  --in leaf.der
-  rsa    verify-binding  --id 0xF0000001  --cert leaf.der
+  rsa    write-cert      --id 0xFE000002  --in leaf.der
+  rsa    verify-binding  --id 0xFE000001  --cert leaf.der
 
   Not yet implemented:
          rotate-scp03    (derive per-device keys from UID; irreversible)

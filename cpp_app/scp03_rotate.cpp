@@ -4,6 +4,8 @@
  */
 
 #include "scp03_rotate.hpp"
+#include "scp03_keyfile.hpp"
+#include "sw_decode.hpp"
 #include "log.hpp"
 
 #include <cstdio>
@@ -52,43 +54,22 @@ inline NXSCP03_StaticCtx_t *staticCtx(Session &s) {
     return s.bootCtx()->se05x_open_ctx.auth.ctx.scp03.pStatic_ctx;
 }
 
-// Read the current 16-byte DEK from the SCP03 key file ($EX_SSS_BOOT_SCP03_PATH).
-// File format (as written by the NXP demo): lines "ENC <hex>", "MAC <hex>", "DEK <hex>".
-bool readDekFromScp03File(uint8_t dek[kScpKeyLen]) {
-    const char *path = std::getenv("EX_SSS_BOOT_SCP03_PATH");
-    if (!path || !*path) return false;
-    FILE *fp = std::fopen(path, "r");
-    if (!fp) return false;
-
-    char line[512];
-    bool found = false;
-    while (std::fgets(line, sizeof(line), fp)) {
-        const char *p = line;
-        while (*p == ' ' || *p == '\t') ++p;
-        if (std::strncmp(p, "DEK ", 4) != 0) continue;
-        p += 4;
-        while (*p == ' ' || *p == '\t') ++p;
-        found = true;
-        for (int i = 0; i < kScpKeyLen; ++i) {
-            unsigned b = 0;
-            if (std::sscanf(p + i * 2, "%02x", &b) != 1) { found = false; break; }
-            dek[i] = static_cast<uint8_t>(b);
-        }
-        break;
-    }
-    std::fclose(fp);
-    return found;
-}
-
 // Load the current DEK into pStatic_ctx->Dek so genKcvAndEncryptKey can wrap
 // with it.  A standard ex_sss_boot_open does NOT populate this object, so we
-// replicate the demo's ex_sss_entry preamble.
+// replicate the demo's ex_sss_entry preamble.  The DEK is read from the SCP03
+// key file ($EX_SSS_BOOT_SCP03_PATH) via the shared Scp03KeyFile parser.
 void loadCurrentDek(Session &s) {
-    uint8_t dek[kScpKeyLen] = {};
-    if (!readDekFromScp03File(dek))
+    const char *path = std::getenv("EX_SSS_BOOT_SCP03_PATH");
+    if (!path || !*path)
         throw std::runtime_error(
-            "rotateScp03: cannot read current DEK from $EX_SSS_BOOT_SCP03_PATH key file "
-            "(need a 'DEK <32 hex>' line; this is the key used to wrap the new keys)");
+            "rotateScp03: $EX_SSS_BOOT_SCP03_PATH is not set; cannot read the current DEK "
+            "needed to wrap the new keys");
+
+    uint8_t dek[kScpKeyLen] = {};
+    if (!Scp03KeyFile::readDek(path, dek))
+        throw std::runtime_error(
+            std::string("rotateScp03: cannot read current DEK from '") + path +
+            "' (need a 'DEK <32 hex>' line; this is the key used to wrap the new keys)");
 
     NXSCP03_StaticCtx_t *st = staticCtx(s);
     st->key_len = kScpKeyLen;
@@ -179,13 +160,19 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
     NXSCP03_StaticCtx_t *st     = staticCtx(s);
     const uint8_t        keyVer = st->keyVerNo; // KVN to replace (e.g. 0x0B on 07.02)
 
-    // DEBUG: report the negotiated SCP03 security level.  PUT KEY needs
-    // C-DECRYPTION (0x33); reads succeed at lower levels, so a 0x6982 on PUT
-    // KEY with a level below 0x33 means the session must be opened at full
-    // security before rotation.
+    // PUT KEY requires the SCP03 channel at full security (C-MAC + C-DECRYPTION
+    // = 0x33); the wrapped key data must be command-encrypted.  Reads succeed at
+    // lower levels, so fail fast here with a clear message rather than letting
+    // the card reject with an opaque 0x6982.
     auto *dyn = s.bootCtx()->se05x_open_ctx.auth.ctx.scp03.pDyn_ctx;
-    LOG_INFO("rotateScp03: SCP03 dyn SecurityLevel = 0x%02X (need 0x33 for PUT KEY)\n",
-             dyn ? dyn->SecurityLevel : 0xFF);
+    const unsigned secLevel = dyn ? dyn->SecurityLevel : 0xFF;
+    LOG_DEBUG("rotateScp03: SCP03 SecurityLevel = 0x%02X (need 0x33)\n", secLevel);
+    if (secLevel != 0x33)
+        throw std::runtime_error(
+            "rotateScp03: SCP03 security level is 0x" +
+            [secLevel] { char b[4]; std::snprintf(b, sizeof(b), "%02X", secLevel); return std::string(b); }() +
+            ", but PUT KEY needs 0x33 (C-MAC + C-DECRYPTION); open the session at full "
+            "security before rotating");
 
     // Make sure the current DEK is available to wrap the new keys.
     loadCurrentDek(s);
@@ -229,8 +216,7 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
     if (txr != SM_OK) {
         std::snprintf(swbuf, sizeof(swbuf), "%04X", static_cast<unsigned>(txr));
         throw std::runtime_error(std::string("rotateScp03: PUT KEY transport failed (SW=0x") +
-                                 swbuf + ") - if 0x6985/0x6D00 the applet is selected; "
-                                 "rotation needs an ISD session (skip_select_applet=1)");
+                                 swbuf + " - " + swMeaning(txr) + ")");
     }
     if (rspLen < expLen + 2)
         throw std::runtime_error("rotateScp03: PUT KEY response too short (" +
@@ -240,7 +226,8 @@ void rotateScp03(Session &s, const Scp03KeySet &newKeys, bool dryRun) {
     smStatus_t sw = static_cast<smStatus_t>((rsp[rspLen - 2] << 8) | rsp[rspLen - 1]);
     if (sw != SM_OK) {
         std::snprintf(swbuf, sizeof(swbuf), "%04X", static_cast<unsigned>(sw));
-        throw std::runtime_error(std::string("rotateScp03: PUT KEY rejected (SW=0x") + swbuf + ")");
+        throw std::runtime_error(std::string("rotateScp03: PUT KEY rejected (SW=0x") + swbuf +
+                                 " - " + swMeaning(sw) + ")");
     }
 
     // Confirm the SE stored exactly the keys we sent (KVN + each KCV).

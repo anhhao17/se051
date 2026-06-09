@@ -75,6 +75,25 @@ bool objectExists(Session &s, uint32_t id);
 void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der);
 
 /**
+ * @brief Write a plain binary blob to a persistent, rewritable SE object.
+ * @param s      Active session.
+ * @param id     SE05x object ID.
+ * @param data   Bytes to store.
+ * @param force  If the object already exists: erase+replace when true; otherwise
+ *               leave it untouched.
+ * @return       true if written, false if it already existed and @p force was false.
+ * @throws CryptoError on SE failure.
+ */
+bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool force);
+
+/**
+ * @brief Read a binary SE object back.
+ * @throws CryptoError if the object does not exist or cannot be read.
+ */
+std::vector<uint8_t> readBinary(Session &s, uint32_t id);
+
+
+/**
  * @brief Verify that the RSA private key at @p keyId corresponds to the
  *        public key embedded in @p certDer.
  *

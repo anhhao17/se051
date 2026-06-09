@@ -6,6 +6,7 @@
 #include "se05x_provision.hpp"
 #include "log.hpp"
 
+#include <cstdio>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -81,6 +82,54 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
                                 der.size() * 8, nullptr, 0),
           "sss_key_store_set_key(cert)");
     sss_key_object_free(&obj);
+}
+
+// Plain binary object storage (no object policy - rewritable).
+
+bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool force) {
+    LOG_DEBUG("writeBinary: id=0x%08X, %zu bytes, force=%d\n", id, data.size(), force);
+    if (objectExists(s, id)) {
+        if (!force) {
+            LOG_INFO("writeBinary: object 0x%08X already exists (use --force to overwrite)\n", id);
+            return false;
+        }
+        LOG_DEBUG("writeBinary: erasing existing object 0x%08X\n", id);
+        sss_object_t old{};
+        sss_key_object_init(&old, s.keystore());
+        sss_key_object_get_handle(&old, id);
+        sss_key_store_erase_key(s.keystore(), &old);
+        sss_key_object_free(&old);
+    }
+
+    sss_object_t obj{};
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init(bin)");
+    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default,
+                                         kSSS_CipherType_Binary, data.size(),
+                                         kKeyObject_Mode_Persistent),
+          "sss_key_object_allocate_handle(bin)");
+    check(sss_key_store_set_key(s.keystore(), &obj, data.data(), data.size(),
+                                data.size() * 8, nullptr, 0),
+          "sss_key_store_set_key(bin)");
+    sss_key_object_free(&obj);
+    return true;
+}
+
+std::vector<uint8_t> readBinary(Session &s, uint32_t id) {
+    LOG_DEBUG("readBinary: id=0x%08X\n", id);
+    sss_object_t obj{};
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init(bin read)");
+    if (sss_key_object_get_handle(&obj, id) != kStatus_SSS_Success) {
+        sss_key_object_free(&obj);
+        throw CryptoError("readBinary: object not found", kStatus_SSS_Fail);
+    }
+    std::vector<uint8_t> buf(2048);
+    size_t               len    = buf.size();
+    size_t               bitLen = buf.size() * 8;
+    sss_status_t         st     = sss_key_store_get_key(s.keystore(), &obj, buf.data(), &len, &bitLen);
+    sss_key_object_free(&obj);
+    check(st, "sss_key_store_get_key(bin)");
+    buf.resize(len);
+    return buf;
 }
 
 // Binding verification

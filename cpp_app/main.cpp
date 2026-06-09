@@ -1,30 +1,30 @@
 /**
  * @file main.cpp
- * @brief Entry point: construct the correct backend and run the CLI.
+ * @brief Entry point: parse argv, open the session the chosen command needs,
+ *        then run the command.
  *
- * SE05x supports only ONE Platform SCP03 channel at a time.  Opening both
- * ex_sss_boot (SSS) and PKCS#11 C_Initialize simultaneously resets whichever
- * channel was opened first, causing APDU errors (0x6982) on the stale session.
+ * The SE05x supports only ONE Platform SCP03 channel at a time, so this opens
+ * EITHER a PKCS#11 context OR an SSS session - never both.  Which one, and
+ * whether the applet is selected, is driven entirely by the command's declared
+ * SessionNeed (no per-command special-casing here):
  *
- * Resolution: pre-parse the command group/name and open EITHER the SSS session
- * OR the PKCS#11 context - never both:
- *
- *   Pkcs11Backend  - rng, rsa genkey/pub/sign/verify/encrypt/decrypt/csr  (+--pkcs11)
- *   SssBackend     - everything else (se uid, rsa write-cert / verify-binding,
- *                    and any rsa command without --pkcs11)
+ *   Crypto      + --pkcs11  -> Pkcs11Backend (no SSS session)
+ *   Crypto      (no pkcs11) -> SSS session, applet selected, SssBackend
+ *   Management              -> SSS session, applet selected (uid/cert/binding)
+ *   Isd                     -> SSS session, applet NOT selected (rotate-scp03)
  */
 
 #include "cli.hpp"
+#include "command.hpp"
+#include "commands.hpp"
 #include "crypto_backend.hpp"
 #include "log.hpp"
+#include "output.hpp"
 
-#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <stdexcept>
-#include <string>
 
 extern "C" {
 #include <ex_sss_boot.h>
@@ -32,86 +32,64 @@ extern "C" {
 }
 
 namespace {
-
-/** @brief Return the value of a named option from argv, or nullptr if absent. */
+/** @brief Return the value following @p flag in argv, or nullptr. */
 const char *argValue(int argc, char **argv, const char *flag) {
     for (int i = 1; i + 1 < argc; ++i)
         if (std::strcmp(argv[i], flag) == 0) return argv[i + 1];
     return nullptr;
 }
-
-struct PreParsed {
-    std::string group, command;
-};
-
-/** @brief Extract the first two positional tokens (group and command). */
-PreParsed preParse(int argc, char **argv) {
-    PreParsed r;
-    for (int i = 1; i < argc; ++i) {
-        std::string t = argv[i];
-        if (t.rfind("--", 0) == 0) {
-            if (t != "--force" && i + 1 < argc) ++i;
-        } else {
-            if (r.group.empty())
-                r.group = t;
-            else if (r.command.empty()) {
-                r.command = t;
-                break;
-            }
-        }
-    }
-    return r;
-}
-
-/**
- * @brief Return true when the command is handled entirely by PKCS#11 and must
- *        not open a parallel SSS session (which would reset the SCP03 channel).
- */
-bool isPkcs11Command(const std::string &group, const std::string &cmd) {
-    if (group == "rng") return true;
-    if (group != "rsa") return false;
-    static const std::array<const char *, 8> cmds = {
-        {"genkey", "provision", "sign", "verify", "encrypt", "decrypt", "csr", "pub"}};
-    for (const char *c : cmds)
-        if (cmd == c) return true;
+bool hasFlag(int argc, char **argv, const char *flag) {
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], flag) == 0) return true;
     return false;
 }
-
 } // namespace
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        Cli::usage(argv[0]);
+        CommandRegistry().usage(argv[0]);
         return 1;
     }
 
     const char *logPath = argValue(argc, argv, "--log");
+    const bool  debug   = hasFlag(argc, argv, "--debug") || hasFlag(argc, argv, "--verbose");
     try {
-        Log::init(logPath);
+        Log::init(logPath, debug ? Log::DEBUG : Log::INFO);
     } catch (const std::exception &e) {
         std::fprintf(stderr, "[!] %s\n", e.what());
         return 1;
     }
 
-    const char *portEnv  = std::getenv("EX_SSS_BOOT_SSS_PORT");
-    const char *portArg  = argValue(argc, argv, "--port");
-    const char *portName = portArg ? portArg : portEnv;
+    CommandRegistry registry;
+    Args            a = parseArgs(argc, argv);
+    if (a.group.empty()) {
+        registry.usage(argv[0]);
+        return 1;
+    }
 
+    const Command *cmd = registry.find(a.group, a.command);
+    if (!cmd) {
+        registry.usage(argv[0]);
+        LOG_ERROR("unknown command: %s %s\n", a.group.c_str(), a.command.c_str());
+        return 1;
+    }
+
+    const char *portName = argValue(argc, argv, "--port");
+    if (!portName) portName = std::getenv("EX_SSS_BOOT_SSS_PORT");
     const char *pkcs11Lib = argValue(argc, argv, "--pkcs11");
 
-    auto pre       = preParse(argc, argv);
-    bool usePkcs11 = pkcs11Lib && isPkcs11Command(pre.group, pre.command);
+    const SessionNeed need      = cmd->sessionNeed();
+    const bool        usePkcs11 = pkcs11Lib && need == SessionNeed::Crypto;
 
-    // PlatformSCP03 key rotation targets the ISD, not the SE05x applet.  Open
-    // the session with applet selection skipped (mirrors the NXP demo's
-    // EX_SSS_BOOT_SKIP_SELECT_APPLET=1); otherwise PUT KEY is parsed in the
-    // applet context and the card rejects it (e.g. SW 0x6A80 / 0x6985).
-    const bool isIsdCommand = (pre.group == "se" && pre.command == "rotate-scp03");
+    LOG_DEBUG("dispatch: %s %s (session=%s)\n", a.group.c_str(), a.command.c_str(),
+              usePkcs11 ? "PKCS#11"
+                        : (need == SessionNeed::Isd ? "SSS/ISD (applet skipped)" : "SSS (applet)"));
 
     ex_sss_boot_ctx_t               ctx{};
     bool                            sssOpened = false;
     std::unique_ptr<se05x::Session> session;
     std::unique_ptr<ICryptoBackend> backend;
+    OutputWriter                    out;
 
     if (usePkcs11) {
         try {
@@ -121,7 +99,8 @@ int main(int argc, char **argv) {
             return 1;
         }
     } else {
-        if (isIsdCommand) ctx.se05x_open_ctx.skip_select_applet = 1;
+        // Rotation targets the ISD; everything else uses the applet.
+        if (need == SessionNeed::Isd) ctx.se05x_open_ctx.skip_select_applet = 1;
 
         sss_status_t st = ex_sss_boot_open(&ctx, portName);
         if (st != kStatus_SSS_Success) {
@@ -130,11 +109,6 @@ int main(int argc, char **argv) {
                       static_cast<unsigned>(st));
             return 1;
         }
-        // Run on every path, including the ISD/rotate path: this is what the
-        // NXP demo does (ex_sss_main_inc.h calls it unconditionally even with
-        // skip_select_applet=1).  With the applet skipped it does ISD-only
-        // setup and does NOT select the applet; skipping it leaves the SCP03
-        // security level unset and PUT KEY is rejected with SW 0x6982.
         st = ex_sss_key_store_and_object_init(&ctx);
         if (st != kStatus_SSS_Success) {
             LOG_ERROR("key store init failed (0x%04x)\n", static_cast<unsigned>(st));
@@ -146,11 +120,12 @@ int main(int argc, char **argv) {
         backend   = std::make_unique<SssBackend>(*session);
     }
 
-    int rc = 0;
+    CommandContext cctx{*backend, session.get(), out};
+    int            rc = 0;
     try {
-        rc = Cli(*backend, session.get()).run(argc, argv);
+        rc = cmd->run(cctx, a);
     } catch (const std::exception &e) {
-        LOG_ERROR("%s\n", e.what());
+        LOG_ERROR("command '%s %s' failed: %s\n", a.group.c_str(), a.command.c_str(), e.what());
         rc = 1;
     }
 

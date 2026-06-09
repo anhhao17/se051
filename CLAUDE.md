@@ -200,8 +200,8 @@ se05x_crypto_app [--pkcs11 <lib>] [--port <conn>] [--log <file>] <group> <comman
   Policy is ignored by the PKCS#11 backend. Implementation: `se05x::generateKeyWithPolicy()`
   in `se05x_provision.cpp`; uses `sss_policy_asym_key_u` (sign/decrypt/gen) + `sss_policy_common_u`
   (req_Sm=1, can_Delete=0, can_Write=0, can_Read=1) passed as `options` to `sss_key_store_generate_key`.
-- **Key IDs**: CLI default `0xFE000001` (test range). Production provisioning uses `0xF0000001`
-  (key) / `0xF0000002` (cert).
+- **Key IDs**: CLI default `0xFE000001` (test range). Production provisioning uses `0xFE000001`
+  (key) / `0xFE000001` (cert).
 - **Connect string** via `--port` or `$EX_SSS_BOOT_SSS_PORT` (e.g. `/dev/i2c-1:0x48`).
 - **Not yet implemented**: `rotate-scp03` (per-device SCP03 key KDF from UID - irreversible; treat
   carefully).

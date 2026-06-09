@@ -81,17 +81,6 @@ else
     ok "rsa verify rejects tampered message"
 fi
 
-echo "secret data 12345" > "$TESTDIR/plain.txt"
-
-run "rsa encrypt"    rsa encrypt --in "$TESTDIR/plain.txt"      --out "$TESTDIR/cipher.bin"
-run "rsa decrypt"    rsa decrypt --in "$TESTDIR/cipher.bin"     --out "$TESTDIR/plain_dec.txt"
-
-if cmp -s "$TESTDIR/plain.txt" "$TESTDIR/plain_dec.txt" 2>/dev/null; then
-    ok "rsa encrypt/decrypt round-trip"
-else
-    fail "rsa encrypt/decrypt round-trip mismatch"
-fi
-
 run "rsa csr" \
     rsa csr --subject "CN=device-test,O=TestCorp" --out "$TESTDIR/device.csr" 
 
@@ -119,9 +108,21 @@ else
     echo "[SKIP] write-cert/verify-binding: openssl not available"
 fi
 
-MASTER=000102030405060708090a0b0c0d0e0f
+INFO_DATA="device-type=TEST;serial=SN-0001;hwrev=A"
+run "se write-info"        se write-info  --data "$INFO_DATA" --force
+run "se read-info"         se read-info
+if "$APP" se verify-info --data "$INFO_DATA" >/dev/null 2>&1; then
+    ok "se write/read/verify-info round-trip (PASS)"
+else
+    fail "se write/read/verify-info round-trip"
+fi
+
+# rotate-scp03 dry-run: builds the PUT KEY APDU and verifies preconditions
+# (ISD session + current DEK from $EX_SSS_BOOT_SCP03_PATH) without sending it.
+# Placeholder keys are fine for --dry-run since nothing is written to the SE.
+ZERO=00000000000000000000000000000000
 echo "--- se rotate-scp03 --dry-run ---"
-if "$APP" se rotate-scp03 --master-key "$MASTER" --dry-run; then
+if "$APP" se rotate-scp03 --enc "$ZERO" --mac "$ZERO" --dek "$ZERO" --dry-run; then
     ok "se rotate-scp03 --dry-run"
 else
     fail "se rotate-scp03 --dry-run"

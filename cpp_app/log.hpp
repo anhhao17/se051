@@ -31,7 +31,7 @@
  */
 class Log {
 public:
-    enum Level { DEBUG = 0, INFO = 1, OK = 2, ERROR = 3 };
+    enum Level { DEBUG = 0, INFO = 1, OK = 2, WARN = 3, ERROR = 4 };
 
     /**
      * Initialise the global logger.  Call once in main() before any LOG_* use.
@@ -106,6 +106,8 @@ private:
             return "[i]";
         case OK:
             return "[+]";
+        case WARN:
+            return "[w]";
         case ERROR:
             return "[!]";
         }
@@ -137,4 +139,5 @@ private:
 #define LOG_DEBUG(...) Log::get().logAt(Log::DEBUG, __FILE__, __LINE__, __VA_ARGS__)
 #define LOG_INFO(...) Log::get().logAt(Log::INFO, __FILE__, __LINE__, __VA_ARGS__)
 #define LOG_OK(...) Log::get().logAt(Log::OK, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_WARN(...) Log::get().logAt(Log::WARN, __FILE__, __LINE__, __VA_ARGS__)
 #define LOG_ERROR(...) Log::get().logAt(Log::ERROR, __FILE__, __LINE__, __VA_ARGS__)

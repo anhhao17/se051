@@ -121,13 +121,13 @@ scp build/stage/lib/libsss_pkcs11.so  pi@<host>:/home/pi/
 ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
 
 # Provision an RSA-2048 identity key (idempotent) and emit a CSR
-./se05x_crypto_app --port /dev/i2c-1:0x48 rsa genkey --id 0xF0000001 --bits 2048
-./se05x_crypto_app --port /dev/i2c-1:0x48 rsa csr --id 0xF0000001 \
+./se05x_crypto_app --port /dev/i2c-1:0x48 rsa genkey --id 0xFE000001 --bits 2048
+./se05x_crypto_app --port /dev/i2c-1:0x48 rsa csr --id 0xFE000001 \
     --subject "CN=device-001,O=Acme" --out /home/pi/dev.csr
 
 # Same crypto via the PKCS#11 module
 ./se05x_crypto_app --pkcs11 ./libsss_pkcs11.so --port /dev/i2c-1:0x48 rsa sign \
-    --id 0xF0000001 --in payload.bin --out payload.sig
+    --id 0xFE000001 --in payload.bin --out payload.sig
 ```
 
 ## Project structure
@@ -162,8 +162,8 @@ ssh pi@<host> './se05x_crypto_app --port /dev/i2c-1:0x48 rng 32'
 | ID | Purpose |
 |---|---|
 | `0xFE000001` | CLI default RSA key |
-| `0xF0000001` | Production device identity RSA key |
-| `0xF0000002` | Production device leaf certificate (DER) |
+| `0xFE000001` | Production device identity RSA key |
+| `0xFE000002` | Production device leaf certificate (DER) |
 
 Demo/reference keys in `examples/` use the `0xEF000000-0xEFFFFFFF` test range and are erased
 before each run. `rsa genkey` is idempotent: an existing key is reused unless `--force` is given.

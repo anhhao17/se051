@@ -74,13 +74,7 @@ public:
     virtual bool verify(uint32_t id, const std::vector<uint8_t> &msg,
                         const std::vector<uint8_t> &sig) = 0;
 
-    /** @brief Encrypt @p plain with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> encrypt(uint32_t                    id,
-                                         const std::vector<uint8_t> &plain) = 0;
 
-    /** @brief Decrypt @p cipher with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> decrypt(uint32_t                    id,
-                                         const std::vector<uint8_t> &cipher) = 0;
 
     /**
      * @brief Build a PEM PKCS#10 CSR for the key at @p id.
@@ -109,9 +103,6 @@ public:
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
                                 const std::vector<uint8_t> &sig) override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
-    std::vector<uint8_t> decrypt(uint32_t                    id,
-                                 const std::vector<uint8_t> &cipher) override;
     std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
@@ -136,9 +127,6 @@ public:
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
                                 const std::vector<uint8_t> &sig) override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
-    std::vector<uint8_t> decrypt(uint32_t                    id,
-                                 const std::vector<uint8_t> &cipher) override;
     std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:

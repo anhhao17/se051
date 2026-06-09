@@ -73,7 +73,7 @@ Completed so far: WS1 + WS2 + WS4 (~8-10.5 eng-d). Remaining: WS3 + WS5 + WS6 + 
 | Command | Test | Pass criteria |
 |---------|------|---------------|
 | `rng 16` | request bytes | 16 hex bytes, non-constant across runs |
-| `rsa genkey` | generate at `0xF0000001` | succeeds; public key returned; second run without `--force` is a no-op |
+| `rsa genkey` | generate at `0xFE000001` | succeeds; public key returned; second run without `--force` is a no-op |
 | `rsa sign`/`verify` | sign a file, verify | `VERIFY OK`; tampered input → `VERIFY FAILED` (exit 2) |
 | `rsa encrypt`/`decrypt` | round-trip a payload | output == input |
 | `rsa csr` | issue CSR | `openssl req -verify -text -noout` passes; UID present in subject |
