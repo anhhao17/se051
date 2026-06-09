@@ -34,7 +34,7 @@ test master), field firmware.
 |----|-----------|-------|--------------|--------|
 | WS1 | Build hygiene | `BUILD_ALWAYS ON`, pin mbedTLS config (`MBEDTLS_CMAC_C`), reproducible build, CI smoke build; `--log <file>` output routing | 0.5-1 | **done** |
 | WS2 | PKCS#11 crypto path | Cryptoki init/session/login; `genkey`/`sign`/`verify`/`encrypt`/`decrypt`/`csr`/`rng` via PKCS#11; SCP03 channel conflict prevention; `--pkcs11` flag | 4-6 | **done** |
-| WS3 | SE management (SSS) | `set-policy` (sign/dec-only, no-read, no-write, SCP03-required); `rotate-scp03` (KDF from UID) with dry-run + confirm guard | 4-6 | **not started** |
+| WS3 | SE management (SSS) | `--policy` flag on `rsa genkey` (sign-only, sign-decrypt; req_Sm, non-deletable, non-exportable set at creation); `rotate-scp03` (KDF from UID) not yet | 4-6 | **partial** |
 | WS4 | Provisioning commands | `se uid`; `rsa write-cert`; `rsa verify-binding` (TRNG nonce → SE sign → mbedTLS verify); `genkey` idempotency guard (`objectExists`, reuse on no `--force`) | 2.5-3.5 | **done** |
 | WS5 | CA-hub integration | CSR submit / cert fetch over mTLS; local stub CA (openssl) for tests | 2.5-3.5 | **not started** |
 | WS6 | Orchestration + audit | Script chaining phases 0-7; per-UID audit log (UID, serial, fingerprint, results); failure handling / resume | 2.5-3.5 | **not started** |
@@ -53,7 +53,7 @@ Completed so far: WS1 + WS2 + WS4 (~8-10.5 eng-d). Remaining: WS3 + WS5 + WS6 + 
 |-----------|----------|---------------|--------|
 | M1 - Build stable | WS1 | Clean rebuild always picks up source changes; `rng 16` returns bytes on hardware | **done** |
 | M2 - PKCS#11 path | WS2 | `genkey`/`sign`/`verify`/`encrypt`/`decrypt`/`csr`/`rng` work via PKCS#11; CSR verifies in openssl | **done** |
-| M3 - SE management | WS3 | `set-policy` enforced (read/write denied after lock); `rotate-scp03` round-trips on a test part | **not started** |
+| M3 - SE management | WS3 | `set-policy` enforced (read/write denied after lock); `rotate-scp03` round-trips on a test part | **partial** (policy done; rotate-scp03 not started) |
 | M4 - Provisioning cmds | WS4 | `se uid`; `rsa write-cert` + `rsa verify-binding` pass on a real issued cert; `rsa genkey` idempotent | **done** |
 | M5 - CA + orchestration | WS5, WS6 | One device provisioned end-to-end through the stub CA; audit record written | **not started** |
 | M6 - Test + docs | WS7, WS8 | Test suite green; runbook complete; pilot run of N units | **not started** |
@@ -73,7 +73,7 @@ Completed so far: WS1 + WS2 + WS4 (~8-10.5 eng-d). Remaining: WS3 + WS5 + WS6 + 
 | Command | Test | Pass criteria |
 |---------|------|---------------|
 | `rng 16` | request bytes | 16 hex bytes, non-constant across runs |
-| `rsa genkey` | generate at `0xF0000001` | succeeds; public key returned; second run without `--force` is a no-op |
+| `rsa genkey` | generate at `0xFE000001` | succeeds; public key returned; second run without `--force` is a no-op |
 | `rsa sign`/`verify` | sign a file, verify | `VERIFY OK`; tampered input → `VERIFY FAILED` (exit 2) |
 | `rsa encrypt`/`decrypt` | round-trip a payload | output == input |
 | `rsa csr` | issue CSR | `openssl req -verify -text -noout` passes; UID present in subject |

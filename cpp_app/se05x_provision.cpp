@@ -6,6 +6,7 @@
 #include "se05x_provision.hpp"
 #include "log.hpp"
 
+#include <cstdio>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -13,6 +14,7 @@
 extern "C" {
 #include <fsl_sss_api.h>
 #include <fsl_sss_se05x_apis.h>
+#include <fsl_sss_se05x_policy.h>
 #include "mbedtls/sha256.h"
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/pk.h"
@@ -82,6 +84,54 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der) {
     sss_key_object_free(&obj);
 }
 
+// Plain binary object storage (no object policy - rewritable).
+
+bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool force) {
+    LOG_DEBUG("writeBinary: id=0x%08X, %zu bytes, force=%d\n", id, data.size(), force);
+    if (objectExists(s, id)) {
+        if (!force) {
+            LOG_INFO("writeBinary: object 0x%08X already exists (use --force to overwrite)\n", id);
+            return false;
+        }
+        LOG_DEBUG("writeBinary: erasing existing object 0x%08X\n", id);
+        sss_object_t old{};
+        sss_key_object_init(&old, s.keystore());
+        sss_key_object_get_handle(&old, id);
+        sss_key_store_erase_key(s.keystore(), &old);
+        sss_key_object_free(&old);
+    }
+
+    sss_object_t obj{};
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init(bin)");
+    check(sss_key_object_allocate_handle(&obj, id, kSSS_KeyPart_Default,
+                                         kSSS_CipherType_Binary, data.size(),
+                                         kKeyObject_Mode_Persistent),
+          "sss_key_object_allocate_handle(bin)");
+    check(sss_key_store_set_key(s.keystore(), &obj, data.data(), data.size(),
+                                data.size() * 8, nullptr, 0),
+          "sss_key_store_set_key(bin)");
+    sss_key_object_free(&obj);
+    return true;
+}
+
+std::vector<uint8_t> readBinary(Session &s, uint32_t id) {
+    LOG_DEBUG("readBinary: id=0x%08X\n", id);
+    sss_object_t obj{};
+    check(sss_key_object_init(&obj, s.keystore()), "sss_key_object_init(bin read)");
+    if (sss_key_object_get_handle(&obj, id) != kStatus_SSS_Success) {
+        sss_key_object_free(&obj);
+        throw CryptoError("readBinary: object not found", kStatus_SSS_Fail);
+    }
+    std::vector<uint8_t> buf(2048);
+    size_t               len    = buf.size();
+    size_t               bitLen = buf.size() * 8;
+    sss_status_t         st     = sss_key_store_get_key(s.keystore(), &obj, buf.data(), &len, &bitLen);
+    sss_key_object_free(&obj);
+    check(st, "sss_key_store_get_key(bin)");
+    buf.resize(len);
+    return buf;
+}
+
 // Binding verification
 
 bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &certDer) {
@@ -107,6 +157,44 @@ bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &ce
     mbedtls_x509_crt_free(&crt);
     LOG_DEBUG("verifyBinding: mbedTLS result %d (%s)\n", r, r == 0 ? "OK" : "FAIL");
     return (r == 0);
+}
+
+// Key generation with policy
+
+RsaKey generateKeyWithPolicy(Session &s, uint32_t keyId, RsaBits bits, KeyPolicy policy) {
+    if (policy == KeyPolicy::Full) {
+        return RsaKey::generate(s, keyId, bits, nullptr);
+    }
+
+    // SE05x 07.02 policy notes (see fsl_sss_se05x_policy.c):
+    //   - Asym key policy handles: can_Sign, can_Decrypt, can_Gen, can_Import_Export
+    //   - Common policy handles:   can_Read, can_Write, can_Delete, req_Sm
+    //   - Asym "old policies" (can_Read, can_Write) are silently ignored on 07.02
+
+    sss_policy_u asymPol{};
+    asymPol.type                        = KPolicy_Asym_Key;
+    asymPol.auth_obj_id                 = 0;
+    asymPol.policy.asymmkey.can_Sign    = 1;
+    asymPol.policy.asymmkey.can_Decrypt = (policy == KeyPolicy::SignDecrypt) ? 1 : 0;
+    asymPol.policy.asymmkey.can_Gen     = 1; // needed for on-chip generation
+    // can_Import_Export = 0  ->  private key cannot be exported
+
+    sss_policy_u commonPol{};
+    commonPol.type                     = KPolicy_Common;
+    commonPol.auth_obj_id              = 0;
+    commonPol.policy.common.can_Read   = 1; // allow public key read (needed for CSR / rsa pub)
+    commonPol.policy.common.can_Write  = 0; // prevent overwriting key material after creation
+    commonPol.policy.common.can_Delete = 0; // non-deletable once provisioned
+    commonPol.policy.common.req_Sm     = 1; // all operations require SCP03
+
+    sss_policy_t pol{};
+    pol.policies[0] = &asymPol;
+    pol.policies[1] = &commonPol;
+    pol.nPolicies   = 2;
+
+    LOG_DEBUG("generateKeyWithPolicy: id=0x%08X policy=%s\n", keyId,
+              policy == KeyPolicy::SignOnly ? "sign-only" : "sign-decrypt");
+    return RsaKey::generate(s, keyId, bits, &pol);
 }
 
 } // namespace se05x

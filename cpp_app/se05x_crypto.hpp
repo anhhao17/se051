@@ -91,6 +91,14 @@ public:
     sss_session_t *session() { return &ctx_->session; }
     /** @return SSS key store pointer for key object operations. */
     sss_key_store_t *keystore() { return &ctx_->ks; }
+    /**
+     * @return The underlying boot context.
+     *
+     * Needed only by operations that touch the PlatformSCP03 static context
+     * or the host-crypto session/keystore directly (e.g. rotateScp03).  Most
+     * callers should use session()/keystore() instead.
+     */
+    ex_sss_boot_ctx_t *bootCtx() { return ctx_; }
 
 private:
     ex_sss_boot_ctx_t *ctx_;
@@ -122,12 +130,16 @@ class RsaKey {
 public:
     /**
      * @brief Generate a fresh RSA key pair on the SE and persist it.
-     * @param s     Active session.
-     * @param keyId SE object ID to allocate.
-     * @param bits  Key size.
+     *
+     * @param s       Active session.
+     * @param keyId   SE object ID to allocate.
+     * @param bits    Key size.
+     * @param policy  SE05x object policy to apply at creation time (immutable
+     *                after).  Pass @c nullptr for no restrictions.
      * @throws CryptoError on SE failure.
      */
-    static RsaKey generate(Session &s, uint32_t keyId, RsaBits bits);
+    static RsaKey generate(Session &s, uint32_t keyId, RsaBits bits,
+                           sss_policy_t *policy = nullptr);
 
     /**
      * @brief Bind to an existing persisted RSA key object.

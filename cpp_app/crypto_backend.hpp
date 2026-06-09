@@ -20,6 +20,7 @@
 
 #include "pkcs11_ctx.hpp"
 #include "se05x_crypto.hpp"
+#include "se05x_provision.hpp"
 
 #include <cstdint>
 #include <string>
@@ -46,10 +47,14 @@ public:
 
     /**
      * @brief Generate and persist an RSA key pair on the SE.
-     * @param id    SE object ID.
-     * @param bits  Key size (2048 / 3072 / 4096).
+     *
+     * @param id      SE object ID.
+     * @param bits    Key size (2048 / 3072 / 4096).
+     * @param policy  Object policy applied at creation time (SSS path only;
+     *                ignored by the PKCS#11 backend).
      */
-    virtual void generateKey(uint32_t id, se05x::RsaBits bits) = 0;
+    virtual void generateKey(uint32_t id, se05x::RsaBits bits,
+                             se05x::KeyPolicy policy = se05x::KeyPolicy::Full) = 0;
 
     /** @brief Return the public key at @p id as SubjectPublicKeyInfo DER. */
     virtual std::vector<uint8_t> getSpki(uint32_t id) = 0;
@@ -69,13 +74,7 @@ public:
     virtual bool verify(uint32_t id, const std::vector<uint8_t> &msg,
                         const std::vector<uint8_t> &sig) = 0;
 
-    /** @brief Encrypt @p plain with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> encrypt(uint32_t                    id,
-                                         const std::vector<uint8_t> &plain) = 0;
 
-    /** @brief Decrypt @p cipher with RSA-OAEP-SHA256. */
-    virtual std::vector<uint8_t> decrypt(uint32_t                    id,
-                                         const std::vector<uint8_t> &cipher) = 0;
 
     /**
      * @brief Build a PEM PKCS#10 CSR for the key at @p id.
@@ -98,14 +97,12 @@ public:
     std::vector<uint8_t> getRandom(size_t n) override;
     bool                 keyExists(uint32_t id) override;
     void                 deleteKey(uint32_t id) override;
-    void                 generateKey(uint32_t id, se05x::RsaBits bits) override;
+    void generateKey(uint32_t id, se05x::RsaBits bits,
+                     se05x::KeyPolicy policy = se05x::KeyPolicy::Full) override;
     std::vector<uint8_t> getSpki(uint32_t id) override;
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
                                 const std::vector<uint8_t> &sig) override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
-    std::vector<uint8_t> decrypt(uint32_t                    id,
-                                 const std::vector<uint8_t> &cipher) override;
     std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:
@@ -124,14 +121,12 @@ public:
     std::vector<uint8_t> getRandom(size_t n) override;
     bool                 keyExists(uint32_t id) override;
     void                 deleteKey(uint32_t id) override;
-    void                 generateKey(uint32_t id, se05x::RsaBits bits) override;
+    void generateKey(uint32_t id, se05x::RsaBits bits,
+                     se05x::KeyPolicy policy = se05x::KeyPolicy::Full) override;
     std::vector<uint8_t> getSpki(uint32_t id) override;
     std::vector<uint8_t> sign(uint32_t id, const std::vector<uint8_t> &msg) override;
     bool                 verify(uint32_t id, const std::vector<uint8_t> &msg,
                                 const std::vector<uint8_t> &sig) override;
-    std::vector<uint8_t> encrypt(uint32_t id, const std::vector<uint8_t> &plain) override;
-    std::vector<uint8_t> decrypt(uint32_t                    id,
-                                 const std::vector<uint8_t> &cipher) override;
     std::string          makeCsr(uint32_t id, const std::string &subjectDn) override;
 
 private:

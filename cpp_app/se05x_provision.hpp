@@ -24,6 +24,19 @@
 namespace se05x {
 
 /**
+ * @brief SE05x object policy for RSA keys.
+ *
+ * Policies are applied at key-creation time and are immutable after the fact.
+ * Use @c Full for development/testing; use @c SignDecrypt or @c SignOnly for
+ * production keys (enforces SCP03-required, non-exportable, non-deletable).
+ */
+enum class KeyPolicy {
+    Full,        ///< No restrictions. Suitable for test keys.
+    SignOnly,    ///< Sign only; SCP03 required; non-exportable; non-deletable.
+    SignDecrypt, ///< Sign + decrypt; SCP03 required; non-exportable; non-deletable.
+};
+
+/**
  * @brief Read the SE05x 18-byte chip unique identifier.
  *
  * The UID is permanently set in the SE at manufacture and cannot be
@@ -62,6 +75,25 @@ bool objectExists(Session &s, uint32_t id);
 void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der);
 
 /**
+ * @brief Write a plain binary blob to a persistent, rewritable SE object.
+ * @param s      Active session.
+ * @param id     SE05x object ID.
+ * @param data   Bytes to store.
+ * @param force  If the object already exists: erase+replace when true; otherwise
+ *               leave it untouched.
+ * @return       true if written, false if it already existed and @p force was false.
+ * @throws CryptoError on SE failure.
+ */
+bool writeBinary(Session &s, uint32_t id, const std::vector<uint8_t> &data, bool force);
+
+/**
+ * @brief Read a binary SE object back.
+ * @throws CryptoError if the object does not exist or cannot be read.
+ */
+std::vector<uint8_t> readBinary(Session &s, uint32_t id);
+
+
+/**
  * @brief Verify that the RSA private key at @p keyId corresponds to the
  *        public key embedded in @p certDer.
  *
@@ -80,5 +112,25 @@ void writeCert(Session &s, uint32_t id, const std::vector<uint8_t> &der);
  * @throws std::runtime_error if @p certDer cannot be parsed.
  */
 bool verifyBindingRsa(Session &s, uint32_t keyId, const std::vector<uint8_t> &certDer);
+
+/**
+ * @brief Generate an RSA key pair with a specific SE05x object policy.
+ *
+ * If @p policy is @c KeyPolicy::Full the key is generated with no
+ * restrictions (equivalent to RsaKey::generate with nullptr policy).
+ * Otherwise the serialized policy is passed to the SE at key-creation
+ * time (immutable afterwards):
+ *
+ *  - @c SignOnly    : sign + SCP03-required; no decrypt, no export, no delete
+ *  - @c SignDecrypt : sign + decrypt + SCP03-required; no export, no delete
+ *
+ * @param s       Active session.
+ * @param keyId   SE object ID.
+ * @param bits    RSA key size.
+ * @param policy  Policy to enforce.
+ * @return        Opened RsaKey handle (owns_ = true).
+ * @throws CryptoError on SE failure.
+ */
+RsaKey generateKeyWithPolicy(Session &s, uint32_t keyId, RsaBits bits, KeyPolicy policy);
 
 } // namespace se05x
